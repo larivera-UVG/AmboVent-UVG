@@ -67,3 +67,36 @@ ylabel('position change per 0.2 sec');
 title('Velocity');
 grid on;
 sgtitle('Position and Velocity Profiles of AmboVent System');
+
+%%
+profile_length = 500;
+cycleTime = 5;  % en milis
+smear_factor = 1; % 0 ó 1
+%A_freq = analogRead(pin_FRQ); % Debería estar entre 0 y 1023
+A_freq = 0:1023;
+BPM = floor(6 + (A_freq - 23)/55);  % inicial: 14, rango entre 6 y 30 (según imagen en el pdf)
+breath_cycle_time = 60000./BPM;
+wanted_cycle_time = cycleTime + (breath_cycle_time - 500*cycleTime)*(smear_factor)/500;
+
+figure(2); clf;
+subplot(3,1,1);
+plot(A_freq, BPM);
+xlim([min(A_freq), max(A_freq)]);
+xlabel('Valor del analogRead');
+ylabel('BPM');
+grid on;
+subplot(3,1,2);
+scatter(BPM, wanted_cycle_time, 'filled');
+xlim([min(BPM), max(BPM)]);
+xticks(min(BPM):max(BPM));
+xlabel('BPM');
+ylabel('wanted cycle time (ms)');
+grid on;
+subplot(3,1,3);
+scatter(BPM, profile_length*wanted_cycle_time/1000, 'filled');
+xlim([min(BPM), max(BPM)]);
+xticks(min(BPM):max(BPM));
+xlabel('BPM');
+ylabel('Ciclo completo (s)');
+grid on;
+sgtitle(sprintf('Variable cycleTime = %d,   smear factor = %d', cycleTime, smear_factor));
