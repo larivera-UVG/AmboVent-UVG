@@ -10,21 +10,35 @@
 // Rango del feedback: 410 - 826
 
 #define BOARD 0   // 0 - Nano, 1 - Uno
+#define pressure_sensor_available 1 // 1 - you have installed an I2C pressure sensor
 
-#define profile_length 500
-#define cycleTime 5      // milisec
+#define profile_length 250
+#define cycleTime 10      // milisec
 #define smear_factor 0   // 0 to do all cycle in 2.5 seconds and wait for the rest
                          // 1 to "smear" the motion profile on the whole cycle time
-#define DELTA_TELE_MONITOR (20*cycleTime)
+#define DELTA_TELE_MONITOR (10*cycleTime)
 
 #define perc_of_lower_volume_display 40
 
-unsigned int max_arm_pos = 775, min_arm_pos = 420;
+
+//#include <EEPROM.h>
+#include <Wire.h>    // Used for I2C
+#include "Adafruit_MPRLS.h"
+#include <LiquidCrystal_I2C.h>
+//#include "ArduinoUniqueID.h"
+
+unsigned int max_arm_pos = 800, min_arm_pos = 400;
+
+#if pressure_sensor_available == 1
+//MS5803 sparkfumPress(ADDRESS_HIGH);
+Adafruit_MPRLS adafruitPress(-1, -1);  // valores por defecto
+#endif
+
 
 #if BOARD == 0 // Arduino Nano y Nano chino
 const int pin_PWM = PD3;
-const int pin_INA = PB4; // 12
-const int pin_INB = PB3; // 11
+const int pin_INA = 12; // 12, PB4
+const int pin_INB = 11; // 11, PB3
 const int pin_POT = A0; // para el feedback del motor
 const int pin_FRQ = A1; // para el amplitude frequency control
 const int pin_AMP = A2; // para el amplitude potentiometer control
@@ -46,35 +60,24 @@ int A_pot, prevA_pot, A_amplitude = 80, prev_A_amplitude, A_freq;
 //int A_current; // TODAVÍA NO SÉ CÓMO VA ÉSTE...
 int motorPWM;
 int breath_cycle_time;
+int pressure_abs, pressure_baseline, pressure;
 byte BPM, wanted_cycle_time = cycleTime, insp_pressure;
-unsigned long lastIndex, lastTele;
+unsigned long lastIndex, lastTele, last_read_pres;
 
-byte vel[profile_length] = {129,129,130,130,131,131,132,133,133,134,135,135,136,136,137,138,138,138,139,140,
-                            140,141,141,141,142,142,143,143,144,144,145,145,145,146,146,146,147,147,147,148,
-                            148,148,149,149,149,150,150,150,150,151,151,151,151,151,152,152,152,152,152,152,
-                            153,153,153,153,153,153,153,153,153,153,153,153,153,153,153,153,153,153,153,153,
-                            153,153,153,153,153,153,153,153,153,153,152,152,152,152,152,152,151,151,151,151,
-                            151,150,150,150,150,149,149,149,148,148,148,147,147,147,146,146,146,145,145,145,
-                            144,144,143,143,142,142,141,141,141,140,140,139,138,138,138,137,136,136,135,135,
-                            134,133,133,132,131,131,130,130,129,129,128,128,128,128,128,128,128,128,128,128,
-                            128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
-                            128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
-                            128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
-                            128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
-                            128,128,128,128,128,128,128,128,128,128,128,127,127,126,126,126,125,125,124,124,
-                            123,123,122,122,121,121,120,120,120,119,118,118,118,117,117,116,116,115,115,115,
-                            114,114,113,113,113,112,112,111,111,111,110,110,109,109,109,108,108,108,107,107,
-                            107,107,106,106,106,105,105,105,105,105,104,104,104,104,104,104,103,103,103,103,
-                            103,103,103,103,103,103,103,103,103,103,103,103,103,103,103,103,104,104,104,104,
-                            104,105,105,105,105,105,106,106,106,107,107,107,108,108,108,109,109,109,110,110,
-                            111,111,112,112,113,113,114,114,114,115,116,116,116,117,117,118,118,118,118,118,
-                            119,119,119,119,119,119,119,120,120,120,120,120,120,120,121,121,121,121,121,121,
-                            121,122,122,122,122,122,122,122,123,123,123,123,123,123,123,124,124,124,124,124,
-                            124,124,124,124,125,125,125,125,125,125,125,125,125,126,126,126,126,126,126,126,
-                            126,126,126,126,126,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
-                            127,127,127,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
-                            128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128};
-
+const PROGMEM byte vel[profile_length] =
+    {129,132,134,136,137,139,140,141,142,143,143,144,144,145,146,146,146,147,147,147,
+     148,148,148,148,149,149,149,149,149,149,150,150,150,150,150,150,150,150,150,150,
+     150,150,150,150,150,149,149,149,149,149,149,148,148,148,148,147,147,147,146,146,
+     146,145,144,144,143,143,142,141,140,139,137,136,134,132,129,128,128,128,128,128,
+     128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
+     128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
+     128,128,128,128,128,127,125,123,121,120,119,117,116,115,114,113,112,111,111,110,
+     109,109,108,108,107,107,106,106,106,106,105,105,105,105,105,105,105,105,105,105,
+     105,105,105,105,105,105,106,106,106,107,107,107,108,108,109,109,110,110,111,111,
+     112,113,113,114,115,116,117,118,118,119,119,120,120,120,121,121,121,122,122,122,
+     123,123,123,124,124,124,124,125,125,125,125,125,126,126,126,126,126,127,127,127,
+     127,127,127,127,128,128,128,128,128,128,128,128,128,128,128,128,129,129,129,129,
+     129,129,129,129,129,128,128,128,128,128};
 
 void setup()
 {
@@ -89,6 +92,14 @@ void setup()
     pos_inicial = max_arm_pos;
   if(pos_inicial < min_arm_pos)
     pos_inicial = min_arm_pos;
+
+#if pressure_sensor_available == 1
+//  sparkfumPress.reset();
+//  sparkfumPress.begin();
+//  pressure_baseline = sparkfumPress.getPressure(ADC_4096);
+  adafruitPress.begin();
+  pressure_baseline = adafruitPress.readPressure();
+#endif
 
   // Para empezar en el índice adecuado, según la posición del motor
   index = map(pos_inicial, min_arm_pos, max_arm_pos, 0, 250);
@@ -116,10 +127,10 @@ void loop()
       digitalWrite(pin_INB, HIGH);
     }
 
-    motorPWM = (int)(vel_actual*255.0/25.0);  // 255, el 25 es el máximo valor absoluto del vector vel centrado.
+    motorPWM = (int)(1*vel_actual*255.0/23.0);  // el 23 es el máximo valor absoluto del vector vel centrado.
     analogWrite(pin_PWM, motorPWM);
 
-    index = (index + 1)%500;
+    index = (index + 1)%profile_length;
 
     if(millis() - lastTele >= DELTA_TELE_MONITOR)  // esperar para mostrar telemetry
     {
@@ -157,7 +168,22 @@ void read_IO()
   A_freq = analogRead(pin_FRQ);
   BPM = (byte)(6 + (A_freq - 23)/55);  // BPM es tipo byte, sería mejor hacer type casting
   breath_cycle_time = (int)(60000/BPM);  // es tipo int,  sería mejor hacer type casting
-  wanted_cycle_time = (byte)(cycleTime + int(float(breath_cycle_time - 500*cycleTime)*float(smear_factor)/500));  
+  wanted_cycle_time = (byte)(cycleTime + int(float(breath_cycle_time - 500*cycleTime)*float(smear_factor)/500));
+
+
+#if(pressure_sensor_available==1)
+  if(millis() - last_read_pres > 100)
+  {
+    last_read_pres = millis();
+
+    //pressure_abs = int(sparkfumPress.getPressure(ADC_4096)-pressure_baseline);   // mbar
+    pressure = int(adafruitPress.readPressure());
+    pressure_abs = pressure - pressure_baseline;
+    
+    if(pressure_abs < 0)
+      pressure_abs = 0;
+  }
+#endif
 }
 
 void print_tele()
@@ -167,7 +193,11 @@ void print_tele()
   Serial.print("A_amplitude: ");        Serial.println(A_amplitude);
   Serial.print("insp_pressure: ");      Serial.println(insp_pressure);
   Serial.print("wanted_cycle_time: ");  Serial.println(wanted_cycle_time);
-    
-  Serial.println("");
+  Serial.print("Index: ");              Serial.println(index);
+#if(pressure_sensor_available==1)
+  Serial.print("pressure baseline: ");  Serial.print(pressure_baseline);
+  Serial.print(",   pressure: ");       Serial.print(pressure);
+  Serial.print(",   pressure_abs: ");   Serial.println(pressure_abs);
+#endif
   Serial.println("");
 }

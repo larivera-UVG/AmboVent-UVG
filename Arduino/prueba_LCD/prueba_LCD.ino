@@ -1,23 +1,9 @@
 /*
  AmboVent-UVG
+ prueba_LCD.ino
+ Para verificar el funcionamiento del LCD y las secuencias de calibración
  Based on the original code for the AmboVent (April 12, 2020)
-
-***************** Key modifications *******************************************
- Pressure sensor: This version uses an Adafruit MPRLS pressure sensor (hPa),
- instead of the SparkFun MS5803 sensor (mbar).
- Conversion: 1 hPa (hectopascal) = 100 Pa (pascal) = 1 mbar
-
- Motor driver: This version uses a VNH5019A-E motor driver, instead of the
- REV Robotics SPARK Motor driver.
-*******************************************************************************
 */
-
-/*
- *  THIS CODE WAS WRITTEN FOR USE IN A HOME MADE VENTILATION DEVICE. 
- *  IT IS NOT TESTED FOR SAFETY AND NOT RECOMENDED FOR USE IN ANY COMERCIAL DEVICE.
- *  IT IS NOT APPROVED BY ANY REGULAOTRY AUTHORITY
- *  USE ONLY AT YOUR OWN RISK.
- */
 
 /*  to start calibrations - first enter the maintenance setup menu by pressing TEST button for 3 seconds
  *  using the RATE potentiometer select the calibration required and press TEST to select
@@ -31,15 +17,15 @@
 #define central_monitor_system 0    // 1 - send unique ID for 10 seconds upon startup, 0 - dont
 
 // options for display and debug via serial com
-#define send_to_monitor 1     // 1 = send data to monitor  0 = dont
+#define send_to_monitor 0     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemtry for debug
-#define DELTA_TELE_MONITOR 20  // Delta time (in ms) for displaying telemetry and info to monitor
+#define DELTA_TELE_MONITOR 50  // Delta time (in ms) for displaying telemetry and info to monitor
 
 // UI
 #define deltaUD 5       // define the value change per each button press
 #define pot_alpha 0.85  // filter the pot values
 
-// clinical 
+// clinical
 #define perc_of_lower_volume 50.0       // % of max press - defines lower volume
 #define perc_of_lower_vol_display 33.0  // % of max press - defines lower volume to display when reaching the real lower volume
 #define wait_time_after_resistance 3    // seconds to wait before re-attempt to push air after max pressure was achieved 
@@ -53,29 +39,6 @@
 #define delta_pres_patient_inhale 5     // in cmH2O
 #define alpha_pres 0.98                 // used to average the pressure during the PEEP plateu
 
-
-#if (full_configuration == 0)  // Arm connected with strip or wire
-  #define LCD_available 0 
-  #define pres_pot_available 0  // 1 if the system has 3 potentiometer and can control the inspirium pressure 
-  #define pin_SW2 7   // breath - On / Off / cal
-  #define pin_TST 2   // test mode - not in use
-  #define pin_LED_AMP 11   // amplitude LED
-  #define pin_LED_FREQ 9   // frequency LED
-  #define pin_LED_Fail 10  // FAIL and calib blue LED
-  #define pin_USR 12  // User LED
-  #define pin_FD 4    // freq Down
-  #define pin_FU 5    // freq Up
-  #define pin_AD 8    // Amp Down
-  #define pin_AU 6    // Amp Up
-  #define curr_sense 1 
-  #define control_with_pot 1    // 1 = control with potentiometers  0 = with push buttons
-  #define FF 0.6      // motion control feed forward  
-  #define KP 0.2      // motion control propportional gain 
-  #define KI 2        // motion control integral gain 
-  #define integral_limit 6  // limits the integral of error 
-  #define f_reduction_up_val 0.65   // reduce feedforward by this factor when moving up
-
-#endif
 
 #if (full_configuration == 1) // Direct arm conection 
   #define LCD_available 1 
@@ -132,7 +95,6 @@
 //#define max_address 8
 
 #include <EEPROM.h>
-//#include <Servo.h> 
 #include <Wire.h>    // Used for I2C
 //#include <SparkFun_MS5803_I2C.h>
 #include "Adafruit_MPRLS.h"
@@ -150,46 +112,13 @@ Adafruit_MPRLS adafruitPress(-1, -1);  // valores por defecto
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Set the LCD address to 0x27 for a 16 chars and 2 line display
 #endif
 
-// Motion profile parameters 
-// pos byte 0...255  units: promiles of full range
-// vel int 0...255  ZERO is at 128 , units: pos change per 0.2 sec
-// profile data:  press 125 points (50%) relase 125
-const PROGMEM byte pos[profile_length] =
-    {  0,  0,  1,  2,  4,  6,  8, 10, 13, 15, 18, 21, 25, 28, 31, 35, 38, 42, 46, 50,
-      54, 57, 61, 66, 70, 74, 78, 82, 86, 91, 95, 99,104,108,112,117,121,125,130,134,
-     138,143,147,151,156,160,164,169,173,177,181,185,189,194,198,201,205,209,213,217,
-     220,224,227,230,234,237,240,242,245,247,249,251,253,254,255,255,255,255,255,255,
-     255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-     255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-     255,255,255,255,255,255,255,254,253,252,250,248,246,244,241,238,235,232,229,225,
-     222,218,214,210,206,202,198,193,189,184,180,175,171,166,162,157,152,148,143,138,
-     134,129,124,120,115,111,106,102, 97, 93, 89, 84, 80, 76, 72, 68, 64, 61, 57, 54,
-      50, 47, 44, 41, 38, 36, 33, 31, 29, 27, 25, 23, 22, 20, 19, 17, 16, 15, 13, 12,
-      11, 10,  9,  8,  7,  6,  6,  5,  4,  3,  3,  2,  2,  1,  1,  1,  0,  0,  0,  1,
-       1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  1,  1,  1,  1,  1,
-       1,  1,  1,  0,  0,  0,  0,  0,  0,  0};
-
-const PROGMEM byte vel[profile_length] =
-    {129,132,134,136,137,139,140,141,142,143,143,144,144,145,146,146,146,147,147,147,
-     148,148,148,148,149,149,149,149,149,149,150,150,150,150,150,150,150,150,150,150,
-     150,150,150,150,150,149,149,149,149,149,149,148,148,148,148,147,147,147,146,146,
-     146,145,144,144,143,143,142,141,140,139,137,136,134,132,129,128,128,128,128,128,
-     128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
-     128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
-     128,128,128,128,128,127,125,123,121,120,119,117,116,115,114,113,112,111,111,110,
-     109,109,108,108,107,107,106,106,106,106,105,105,105,105,105,105,105,105,105,105,
-     105,105,105,105,105,105,106,106,106,107,107,107,108,108,109,109,110,110,111,111,
-     112,113,113,114,115,116,117,118,118,119,119,120,120,120,121,121,121,122,122,122,
-     123,123,123,124,124,124,124,125,125,125,125,125,126,126,126,126,126,127,127,127,
-     127,127,127,127,128,128,128,128,128,128,128,128,128,128,128,128,129,129,129,129,
-     129,129,129,129,129,128,128,128,128,128};
 
 byte FD, FU, AD, AU, prev_FD, prev_FU, prev_AD, prev_AU, SW2, prev_SW2, prev_TST,
      RST, LED_status, USR_status, blueOn, calibrated = 0, calibON, numBlinkFreq,
      SW2_pressed, TST_pressed, menu_state;
 byte monitor_index = 0, BPM = 14, prev_BPM, in_wait, failure, send_beep,
      wanted_cycle_time, disconnected = 0, high_pressure_detected = 0,
-     motion_failure = 0, sent_LCD, hold_breath, safety_pressure_detected;
+     motion_failure = 0, sent_LCD, hold_breath, safety_pressure_detected = 0;
 byte counter_ON, counter_OFF, SW2temp, insp_pressure, prev_insp_pressure,
      safety_pressure_counter, no_fail_counter, TST, counter_TST_OFF, counter_TST_ON,
      TSTtemp, patient_triggered_breath, motion_time, progress;
@@ -247,7 +176,7 @@ void setup()
 #if LCD_available == 1
   lcd.begin();      // initialize the LCD
   lcd.backlight();  // Turn on the backlight and print a message.
-  lcd.setCursor(0, 0);  lcd.print("AmboVent-UVG   ");
+  lcd.setCursor(0, 0);  lcd.print("AmvoVent-UVG   ");
   lcd.setCursor(0, 1);  lcd.print("1690.108       ");
 #endif
 
@@ -293,7 +222,7 @@ void loop()
       if(SW2_pressed && calibrated == 1)  // start breathing motion
       { 
         state = BREATH_STATE;
-        initialize_breath();
+        //initialize_breath();
       }
 
       if(TST == 0)
@@ -315,7 +244,7 @@ void loop()
       break;
 
     case BREATH_STATE:     // run profile
-      run_profile_func();
+      //run_profile_func();
 
       if(SW2_pressed)
         state = STBY_STATE;  // stop breathing motion
@@ -329,8 +258,8 @@ void loop()
   
   if(millis() - last_sent_data > DELTA_TELE_MONITOR)
   { 
-    if(send_to_monitor == 1 && telemetry == 0)
-      send_data_to_monitor();
+//    if(send_to_monitor == 1 && telemetry == 0)
+//      send_data_to_monitor();
 
     if(telemetry == 1)
       print_tele();
@@ -386,7 +315,7 @@ void display_menu()
 
       if(progress == 1)
       {
-        run_profile_func();
+//        run_profile_func();
 
         if(cycle_number > 0)
           exit_menu();
@@ -490,134 +419,6 @@ void exit_menu()
 }
 
 
-// Controls / performs the sequence of steps for the motor to move, ultimately
-// setting the corresponding PWM.
-void run_profile_func()
-{
-  if(millis() - lastIndex >= wanted_cycle_time) // do when cycle time was reached
-  {
-    cycles_lost = (millis() - lastIndex)/wanted_cycle_time - 1;
-    cycles_lost = constrain(cycles_lost,0,15);
-
-    lastIndex = millis();  // last start of cycle time
-    calculate_wanted_pos_vel();
-    
-    if(100*abs(error)/(max_arm_pos - min_arm_pos) >
-                              motion_control_allowed_error && cycle_number > 1)
-      motion_failure = 1;
-
-    if(safety_pressure_detected)
-      index -= speed_multiplier_reverse*(1+cycles_lost);  // run in reverse if high pressure was detected
-
-    if(index < 0)
-    {
-      if(safety_pressure_detected == 1)
-        safety_pressure_counter += 1;  // count the number of cases reaching safety pressure
-
-      safety_pressure_detected = 0;
-      wait_cycles = 100*wait_time_after_resistance;
-      index = profile_length - 2;  // set index to the point of waiting 
-    }  // stop the reverse when reching the cycle start point
-
-    if(in_wait == 0)
-      index += (1 + cycles_lost);  // advance index while not waiting at the end of cycle
-
-    if(patient_triggered_breath == 1)  // detect drop in presure during the PEEP plateu and trigger breath based on this
-    {
-      if(in_wait == 1 || (index > profile_length/2 && (A_pot < min_arm_pos + range/18)))
-      {
-        if(avg_pres - pressure_abs > delta_pres_patient_inhale)
-          start_new_cycle();  // start new breath cycle if patient tries to inhale durint the PEEP plateu
-
-        avg_pres = avg_pres*alpha_pres + (1 - alpha_pres)*float(pressure_abs);  // calculate the filtered pressure
-      }
-      else
-      { 
-        avg_pres = pressure_abs;
-      }  // initialize the filtered pressure
-    }
-
-    if(index >= (profile_length - 2))  // wait for the next cycle to begin in this point -> 2 points befoe the last cycle index
-    {
-      if(sent_LCD == 0)
-      {
-        sent_LCD = 1;
-#if LCD_available == 1
-        display_LCD();    // update the display at the end of cycle
-#endif
-      }
-
-      if(millis() - start_wait < breath_cycle_time)
-      {
-        index = profile_length - 2;
-        in_wait = 1;  // still need to wait ...
-      }
-      else
-        start_new_cycle();  // time has come ... start from index = 0 
-    }
-
-    blink_user_led();
-  }
-
-  calc_failure();
-  set_motor_PWM(wanted_vel_PWM);
-  find_min_max_pressure();
-}
-
-//---------------- CONTROL ----------------------------------------------
-void calculate_wanted_pos_vel()
-{
-  byte pos_from_profile, vel_from_profile;
-
-  pos_from_profile = pgm_read_byte_near(pos + index);
-  vel_from_profile = pgm_read_byte_near(vel + index + 1);
-
-  range = range_factor*(max_arm_pos - min_arm_pos);  // range of movement in pot' readings
-  wanted_pos = float(pos_from_profile)*range/255 + min_arm_pos;  // wanted pos in pot clicks
-  profile_planned_vel = (float(vel_from_profile) - 128.01)*range/255;  // in clicks per 0.2 second
-
-  planned_vel = profile_planned_vel;
-
-  if(hold_breath == 1 && safety_pressure_detected == 0)
-  {
-    if(wanted_pos <= float(A_pot) || index == 0)
-      hold_breath = 0;
-
-    planned_vel = 0;
-    integral = 0;
-    wanted_pos = float(A_pot);  // hold current position
-  }
-
-  if(safety_pressure_detected)  // to do the revese in case high pressure detected
-    planned_vel = -speed_multiplier_reverse*planned_vel;
-
-  prev_error = error;
-  error = wanted_pos - float(A_pot);
-
-  integral += error*float(wanted_cycle_time)/1000;
-
-  if(integral > integral_limit)
-    integral = integral_limit;
-
-  if(integral < -integral_limit)
-    integral = -integral_limit;
-
-  if(index < 2 || prev_error*error < 0)
-    integral = 0;  // zero the integral accumulator at the beginning of cycle and movement up
-
-  if(planned_vel < 0)
-    f_reduction_up = f_reduction_up_val;
-  else
-    f_reduction_up = 1;  // reduce f for the movement up
- 
-  // PID correction 
-  wanted_vel_PWM = FF*planned_vel*f_reduction_up + KP*error + KI*integral;
-
-  // reduce speed for longer cycles
-  wanted_vel_PWM = wanted_vel_PWM*float(cycleTime)/float(wanted_cycle_time);
-}
-
-
 void standby_func()  // not running profile
 {
   if(USR_status)
@@ -641,13 +442,13 @@ void standby_func()  // not running profile
   
   if(TST_pressed)
   {
-    initialize_breath();
+//    initialize_breath();
     progress = 1;
   }
 
   if(progress == 1)
   {
-    run_profile_func();
+//    run_profile_func();
 
     if(cycle_number > 0)
       progress = 0;
@@ -655,7 +456,7 @@ void standby_func()  // not running profile
   else
   {
     wanted_vel_PWM = 0;  // dont move
-    set_motor_PWM(wanted_vel_PWM);
+//    set_motor_PWM(wanted_vel_PWM);
   }
 
   delay(1);
@@ -713,95 +514,6 @@ void find_min_max_pressure()
     min_pressure = 999;
   }
 }
-
-void blink_user_led()
-{
-  if(high_pressure_detected || safety_pressure_detected)  // blink LED fast
-  {
-    if(USR_status)
-    {
-      if(millis() - lastUSRblink > 20)
-      {
-        USR_status = 0;
-        lastUSRblink = millis();
-        LED_USR(0);
-      }
-    }
-    else
-    {
-      if(millis() - lastUSRblink > 80)
-      {
-        USR_status = 1;
-        lastUSRblink = millis();
-        LED_USR(1);
-      }
-    }
-  }
-  else  // not in failure - blink LED once per cycle 
-  {
-    if(index > 0.1*profile_length)
-      LED_USR(0);
-    else
-      LED_USR(1);
-  }
-}
-
-void calc_failure()
-{
-  if(prev_max_pressure < max_pres_disconnected && cycle_number > 2)
-    disconnected = 1;
-  else
-    disconnected = 0;  // tube was disconnected
-
-  if(pressure_abs > insp_pressure && hold_breath == 0 && profile_planned_vel > 0)
-  {
-    high_pressure_detected = 1;
-    hold_breath = 1;
-    index_to_hold_breath = index;
-  }  // high pressure detected
-
-  if(pressure_abs > safety_pressure && profile_planned_vel > 0)
-    safety_pressure_detected = 1;
-
-  if(pressure_abs > insp_pressure + safety_pres_above_insp && profile_planned_vel > 0)
-    safety_pressure_detected = 1;
-
-  if(index == 0 && prev_index !=0 && failure == 0 && safety_pressure_detected == 0)
-    no_fail_counter += 1;
-
-  if(index == 0)
-    failure = 0;
-
-  if(disconnected)
-    failure = 1;
-
-  if(safety_pressure_detected && safety_pressure_counter >= 1)
-  {
-    failure = 2;
-    safety_pressure_counter = 1;
-  }
-
-  if(motion_failure)
-    failure = 3;
-
-  if(disconnected == 1 || motion_failure == 1 || safety_pressure_detected == 1)
-  {
-    no_fail_counter = 0;
-  }
-  else
-  {
-    LED_FAIL(0);
-  }
-
-  if(no_fail_counter >= 3)
-    safety_pressure_counter = 0;
-
-  if(no_fail_counter >= 100)
-    no_fail_counter = 100;
-
-  prev_index = index;
-}
-
 
 void display_text_2_lines(char *message1, char *message2)
 {
@@ -884,7 +596,7 @@ void internal_arm_calib_step()
   if(TST_pressed)
     progress = 1;
 
-  set_motor_PWM(0);
+//  set_motor_PWM(0);
 
   display_pot_during_calib();
   delay(3);
@@ -972,101 +684,6 @@ void reset_failures()
   motion_failure = 0;
   index_last_motion = index;
   failure = 0;
-}
-
-void set_motor_PWM(float wanted_vel_PWM)
-{
-  if(abs(A_pot - prev_A_pot) > 0 || abs(wanted_vel_PWM) < 15)
-    index_last_motion = index;
-
-  if(calibON == 1)
-    wanted_vel_PWM = read_motion_for_calib();  // allows manual motion during calibration
-
-  if(invert_mot)
-    wanted_vel_PWM = -wanted_vel_PWM;
-
-  if(curr_sense)
-  {
-    if(A_current > max_allowed_current)
-      wanted_vel_PWM = 0;
-  }
-
-  if(motion_failure == 1 && calibON == 0)
-    wanted_vel_PWM = 0;
-
-  if(wanted_vel_PWM > 0)
-    wanted_vel_PWM += 3;  // undo controller dead band
-
-  if(wanted_vel_PWM < 0)
-    wanted_vel_PWM -= 3;  // undo controller dead band
-
-  if(wanted_vel_PWM > PWM_max)
-    wanted_vel_PWM = PWM_max;  // limit PWM
-
-  if(wanted_vel_PWM < PWM_min)
-    wanted_vel_PWM = PWM_min;  // limit PWM
-
-// Set PWM through the REV Robotics SPARK Motor driver. Values between 0 and 180 ---
-//  motorPWM = PWM_mid + int(wanted_vel_PWM);
-//  motor.write(motorPWM);
-
-// Set PWM through the VNH5019A-E driver. Values between 0 and 255 ---
-  if(wanted_vel_PWM < 0)
-  {
-    digitalWrite(INA, HIGH);
-    digitalWrite(INB, LOW);
-    wanted_vel_PWM = -wanted_vel_PWM;
-  }
-  else
-  {
-    digitalWrite(INA, LOW);
-    digitalWrite(INB, HIGH);
-  }
-
-  motorPWM = (int)(wanted_vel_PWM*255.0/PWM_max);  // set between 0 and 255
-  analogWrite(pin_PWM, motorPWM);
-}
-
-int read_motion_for_calib()
-{
-  int wanted_cal_PWM;
-
-  if(control_with_pot)
-  {
-    if(pot_rate > 750)
-      wanted_cal_PWM = (pot_rate - 750)/15;
-
-    if(pot_rate < 250)
-      wanted_cal_PWM = (pot_rate - 250)/15;
-
-    if(pot_rate >= 250 && pot_rate <= 750)
-      wanted_cal_PWM = 0;
-
-    if(SW2 == 1)
-      wanted_cal_PWM = -12;
-
-    // if (RST==1) wanted_cal_PWM= 12;
-
-//    Serial.println(wanted_cal_PWM);
-  }
-  else
-  {
-    wanted_cal_PWM = 0;
-
-    if(FD == 1)
-      wanted_cal_PWM = 8;
-
-    if(FU == 1)
-      wanted_cal_PWM = -8;
-
-    if(AD == 1)
-      wanted_cal_PWM = 16;
-
-    if(AU == 1)
-      wanted_cal_PWM = -16;
-  }
-
-  return(wanted_cal_PWM);
 }
 
 void store_prev_values()
@@ -1329,40 +946,6 @@ void read_IO()
     wanted_cycle_time = cycleTime;
 }
 
-void send_data_to_monitor()
-{
-  if(monitor_index == 0)
-    Serial.println("A");
-
-  if(monitor_index == 1)
-    Serial.println(byte(BPM));
-
-  if(monitor_index == 2)
-    Serial.println(byte(Compression_perc));
-
-  if(monitor_index == 3)
-    Serial.println(byte(pressure_abs));
-
-  if(monitor_index == 4)
-    Serial.println(byte(failure));
-
-  if(monitor_index == 5)
-  {
-    if(send_beep)
-    {
-      Serial.println(byte(1));
-      send_beep = 0;
-    }
-    else
-      Serial.println(byte(0));
-  }
-
-  if(monitor_index == 6)
-    Serial.println(byte(insp_pressure));
-
-  monitor_index = (monitor_index + 1) % 7;
-}
-
 void LED_FREQ(byte val)
 {
   digitalWrite(pin_LED_FREQ, val);
@@ -1385,61 +968,17 @@ void LED_USR(byte val)
 
 void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
 {
-  // Serial.print(" Fail (disc,motion,hiPres):");
-  // Serial.print(disconnected);
-  // Serial.print(",");
-  // Serial.print(motion_failure);
-  // Serial.print(",");
-  // Serial.print(high_pressure_detected);
-
-  // Serial.print(" CL:");
-  // Serial.print(cycles_lost);
-
-  // Serial.print(" min,max:");
-  // Serial.print(min_arm_pos);
-  // Serial.print(",");
-  // Serial.print(max_arm_pos);
-
-  // Serial.print(" WPWM :");
-  // Serial.print(motorPWM);
-
-  // Serial.print(" integral:");
-  // Serial.print(int(integral));
-  
-//---
-  Serial.print(" Wa: ");
-  Serial.print(int(wanted_pos));
-
-  Serial.print(", Feedback: ");
-  Serial.print(A_pot); 
-//---
-
-  // Serial.print(" cur:");
-  // Serial.print(A_current); 
-
-  // Serial.print(" amp:");
-  // Serial.print(A_amplitude); 
-
-  Serial.print(", freq:");
-  Serial.print(A_rate); 
-
-  // Serial.print(" w cyc t:");
-  // Serial.print(wanted_cycle_time);
-
-  // Serial.print(" P(mBar):");
-  // Serial.println(pressure_abs);
-
-  // Serial.print(" RF:");
-  Serial.print(range_factor); 
-
-  Serial.print(", Index: ");
-  Serial.print(index);
-
-  Serial.print(", motorPWM: ");
-  Serial.print(motorPWM);
-
-  Serial.print(", Calibrated: ");
-  Serial.print(calibrated);
-
+  Serial.print("State: ");              Serial.println(state);
+  Serial.print("A_freq: ");             Serial.println(A_rate);
+  Serial.print("Feedback: ");           Serial.println(A_pot);
+  Serial.print("A_amplitude: ");        Serial.println(A_comp);
+  Serial.print("wanted_cycle_time: ");  Serial.println(wanted_cycle_time);
+  Serial.print("min_arm_pos: ");        Serial.print(min_arm_pos);
+  Serial.print(", max_arm_pos: ");      Serial.println(max_arm_pos);
+  Serial.print("Calibrated: ");         Serial.println(calibrated);
+#if(pressure_sensor_available==1)
+  Serial.print("pressure baseline: ");  Serial.print(pressure_baseline);
+  Serial.print(",   pressure_abs: ");   Serial.println(pressure_abs);
+#endif
   Serial.println("");
 }
