@@ -25,6 +25,9 @@
  *  for the Arm range calibration - use the Rate potentiometer to move the arm up/down
  */
 
+#define DEBUG 0     // 1 para que forzar a |error| < ERROR_DEBUG
+#define ERROR_DEBUG 20
+
 // system configuration
 #define full_configuration 1        // 1 is the default - full system.   0 is for partial system - potentiometer installed on pulley, no potentiometers, ...
 #define pressure_sensor_available 1 // 1 - you have installed an I2C pressure sensor 
@@ -33,15 +36,15 @@
 // options for display and debug via serial com
 #define send_to_monitor 1     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemtry for debug
-#define DELTA_TELE_MONITOR 20  // Delta time (in ms) for displaying telemetry and info to monitor
+#define DELTA_TELE_MONITOR 23  // Delta time (in ms) for displaying telemetry and info to monitor
 
 // UI
 #define deltaUD 5       // define the value change per each button press
 #define pot_alpha 0.85  // filter the pot values
 
 // clinical 
-#define perc_of_lower_volume 50.0       // % of max press - defines lower volume
-#define perc_of_lower_vol_display 33.0  // % of max press - defines lower volume to display when reaching the real lower volume
+#define perc_of_lower_volume 50.0       // % of max press - defines lower volume  // 50.0
+#define perc_of_lower_vol_display 33.0  // % of max press - defines lower volume to display when reaching the real lower volume // 33.0
 #define wait_time_after_resistance 3    // seconds to wait before re-attempt to push air after max pressure was achieved 
 #define max_pres_disconnected 10        // if the max pressure during breathing cycle does not reach this value - pipe is disconnected
 #define insp_pressure_default 40        // defualt value - hold this pressure while breathing - the value is changed if INSP_Pressure potentiometer is inatalled 
@@ -80,22 +83,23 @@
 #if (full_configuration == 1) // Direct arm conection 
   #define LCD_available 1 
   #define pres_pot_available 1  // 1 if the system has 3 potentiometer and can control the inspirium pressure 
-  #define pin_SW2 4         // breath - On / Off / cal
-  #define pin_TST 2         // test mode - not in use
-  #define pin_RST 5         // reset alarm - not in use
-  #define pin_LED_AMP 13    // amplitude LED
-  #define pin_LED_FREQ 13   // frequency LED
+  #define pin_TST 4         // test mode - not in use
+  #define pin_SW2 5         // breath - On / Off / cal
+  #define pin_RST 6         // reset alarm - not in use
+  #define pin_USR 7         // User LED
+  #define pin_LED_AMP 8    // amplitude LED
+  #define pin_LED_FREQ 9   // frequency LED
   #define pin_LED_Fail 10   // FAIL and calib blue LED
-  #define pin_USR 9         // User LED
   #define pin_FD 13    // freq Down
   #define pin_FU 13    // freq Up
   #define pin_AD 13    // Amp Down
   #define pin_AU 13    // Amp Up
   #define curr_sense 0
   #define control_with_pot 1  // 1 = control with potentiometers  0 = with push buttons
-  #define FF 4.5              // motion control feed forward  
-  #define KP 1.2              // motion control propportional gain 
-  #define KI 7                // motion control integral gain 
+  #define FF 0.6              // motion control feed forward. 0.6,  4.5
+  #define KP 0.2              // motion control propportional gain 0.2, 1.2
+  #define KI 2                // motion control integral gain 2, 7
+
   #define integral_limit 5    // limits the integral of error 
   #define f_reduction_up_val 0.85    // reduce feedforward by this factor when moving up 
 #endif
@@ -103,15 +107,15 @@
 // Other Arduino pins alocation
 
 // Pins for Motor Driver
-#define pin_PWM 3    // digital pin that sends the PWM to the motor
-#define INA    12    // VERIFICAR ESTE PUERTO
-#define INB    11    // VERIFICAR ESTE PUERTO
+#define pin_PWM  3    // digital pin that sends the PWM to the motor
+#define pin_INA 12    // Para el driver
+#define pin_INB 11    // Para el driver
 
 #define pin_POT A0   // analog pin of motion feedback potentiometer
-#define pin_FRQ A1   // analog pin of rate potentiometer control
-#define pin_AMP A2   // analog pin of amplitude potentiometer control
+#define pin_AMP A1   // analog pin of amplitude potentiometer control
+#define pin_FRQ A2   // analog pin of rate potentiometer control
 #define pin_PRE A3   // analog pin of pressure potentiometer control
-#define pin_CUR 6    // analog pin of current sense
+//#define pin_CUR 6    // analog pin of current sense
 
 // Talon SR or SPARK controller PWM settings ("angle" for Servo library)
 #define PWM_mid 93  // mid value for PWM 0 motion - higher pushes up
@@ -122,14 +126,13 @@
 // motion control parameters
 #define cycleTime 10          // milisec
 #define alpha 0.95            // filter for current apatation - higher = stronger low pass filter
-#define profile_length 250    // motion control profile length 
+#define profile_length 250    // motion control profile length
 #define motion_control_allowed_error  30  // % of range
 
 // motor and sensor definitions
-#define invert_mot 0
+#define invert_mot 1
 #define invert_pot 0
-//#define min_address 4
-//#define max_address 8
+
 
 #include <EEPROM.h>
 //#include <Servo.h> 
@@ -209,7 +212,7 @@ unsigned long lastSent, lastIndex, lastUSRblink, last_TST_not_pressed, lastBlue,
 
 float pot_rate, pot_pres, pot_comp, avg_pres;
 float wanted_pos, wanted_vel_PWM, range, range_factor, profile_planned_vel,
-      planned_vel, integral, error,prev_error, f_reduction_up ;
+      planned_vel, integral, error,prev_error, f_reduction_up;
 
 enum main_states:byte {STBY_STATE, BREATH_STATE, MENU_STATE};
 enum main_states state;
@@ -218,8 +221,8 @@ enum main_states state;
 void setup()
 {
   pinMode(pin_PWM, OUTPUT);
-  pinMode(INA, OUTPUT);  // For driver VNH5019A-E
-  pinMode(INB, OUTPUT);  // For driver VNH5019A-E
+  pinMode(pin_INA, OUTPUT);  // For driver VNH5019A-E
+  pinMode(pin_INB, OUTPUT);  // For driver VNH5019A-E
 
   pinMode(pin_FD, INPUT_PULLUP);
   pinMode(pin_FU, INPUT_PULLUP);
@@ -227,8 +230,8 @@ void setup()
   pinMode(pin_AU, INPUT_PULLUP);
   pinMode(pin_SW2, INPUT_PULLUP);
   pinMode(pin_TST, INPUT_PULLUP);
-//  pinMode(pin_LED_AMP, OUTPUT);
-//  pinMode(pin_LED_FREQ, OUTPUT);
+  pinMode(pin_LED_AMP, OUTPUT);
+  pinMode(pin_LED_FREQ, OUTPUT);
   pinMode(pin_LED_Fail, OUTPUT);
   pinMode(pin_USR, OUTPUT);
 
@@ -278,6 +281,10 @@ void setup()
 
 #if LCD_available == 1
   lcd.backlight();  // Turn on the backlight and print a message.
+#endif
+
+#if DEBUG == 1   
+  randomSeed(analogRead(0));
 #endif
 }
 
@@ -593,6 +600,9 @@ void calculate_wanted_pos_vel()
 
   prev_error = error;
   error = wanted_pos - float(A_pot);
+#if DEBUG == 1  
+  error = -ERROR_DEBUG + random(2*ERROR_DEBUG);
+#endif
 
   integral += error*float(wanted_cycle_time)/1000;
 
@@ -782,7 +792,7 @@ void calc_failure()
   }
 
   if(motion_failure)
-    failure = 3;
+    failure = 3;  // 3
 
   if(disconnected == 1 || motion_failure == 1 || safety_pressure_detected == 1)
   {
@@ -842,6 +852,11 @@ void display_pot_during_calib()
   }
 }
 
+
+// Al calibrar las posiciones extremas del brazo (con el potenciómetro de Feedback),
+// se asume que la "Upper position" corresponde al valor más bajo del potenciómetro,
+// y la "Lower position", al valor más alto. Si el potenciómetro no está conectado
+// de esa forma, hay que cambiar la constante invert_pot a 1.
 void calibrate_arm_range()   // used for calibaration of motion range
 {
   LED_USR(1);
@@ -1013,14 +1028,14 @@ void set_motor_PWM(float wanted_vel_PWM)
 // Set PWM through the VNH5019A-E driver. Values between 0 and 255 ---
   if(wanted_vel_PWM < 0)
   {
-    digitalWrite(INA, HIGH);
-    digitalWrite(INB, LOW);
+    digitalWrite(pin_INA, HIGH);
+    digitalWrite(pin_INB, LOW);
     wanted_vel_PWM = -wanted_vel_PWM;
   }
   else
   {
-    digitalWrite(INA, LOW);
-    digitalWrite(INB, HIGH);
+    digitalWrite(pin_INA, LOW);
+    digitalWrite(pin_INB, HIGH);
   }
 
   motorPWM = (int)(wanted_vel_PWM*255.0/PWM_max);  // set between 0 and 255
@@ -1157,15 +1172,17 @@ void read_IO()
   else
     TST_pressed = 0;
 
-  A_pot = analogRead(pin_POT);
+//  A_pot = analogRead(pin_POT);
 
   if(invert_pot)
-    A_pot = 1023 - A_pot;
+    A_pot = 1023 - analogRead(pin_POT);
+  else
+    A_pot = analogRead(pin_POT);
 
-  A_current = analogRead(pin_CUR)/8;  // in tenth Amps
+//  A_current = analogRead(pin_CUR)/8;  // in tenth Amps
 
   if(control_with_pot)
-  { 
+  {
     A_rate = analogRead(pin_FRQ);
     A_comp = analogRead(pin_AMP);
     A_pres = analogRead(pin_PRE);
@@ -1320,13 +1337,13 @@ void read_IO()
     display_LCD();
 #endif
 
-  wanted_cycle_time = int(100)*int(motion_time)/profile_length;
+  wanted_cycle_time = int(100)*int(motion_time)/profile_length; // between 10 and 20
 
   if(wanted_cycle_time > breath_cycle_time/profile_length)
-    wanted_cycle_time = breath_cycle_time/profile_length;
+    wanted_cycle_time = breath_cycle_time/profile_length;  // máximo es 40.4
 
   if(wanted_cycle_time < cycleTime)
-    wanted_cycle_time = cycleTime;
+    wanted_cycle_time = cycleTime;  // 10
 }
 
 void send_data_to_monitor()
@@ -1385,34 +1402,20 @@ void LED_USR(byte val)
 
 void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
 {
-  // Serial.print(" Fail (disc,motion,hiPres):");
-  // Serial.print(disconnected);
-  // Serial.print(",");
-  // Serial.print(motion_failure);
-  // Serial.print(",");
-  // Serial.print(high_pressure_detected);
+  Serial.print("Fail (disc, motion, hiPres): ");
+  Serial.print(disconnected);
+  Serial.print(", ");
+  Serial.print(motion_failure);
+  Serial.print(", ");
+  Serial.print(high_pressure_detected);
 
   // Serial.print(" CL:");
   // Serial.print(cycles_lost);
 
-  // Serial.print(" min,max:");
-  // Serial.print(min_arm_pos);
-  // Serial.print(",");
-  // Serial.print(max_arm_pos);
-
-  // Serial.print(" WPWM :");
-  // Serial.print(motorPWM);
-
-  // Serial.print(" integral:");
-  // Serial.print(int(integral));
-  
-//---
-  Serial.print(" Wa: ");
-  Serial.print(int(wanted_pos));
-
-  Serial.print(", Feedback: ");
-  Serial.print(A_pot); 
-//---
+   Serial.print(", (min, max):");
+   Serial.print(min_arm_pos);
+   Serial.print(", ");
+   Serial.println(max_arm_pos);
 
   // Serial.print(" cur:");
   // Serial.print(A_current); 
@@ -1420,8 +1423,8 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
   // Serial.print(" amp:");
   // Serial.print(A_amplitude); 
 
-  Serial.print(", freq:");
-  Serial.print(A_rate); 
+  // Serial.print(", freq:");
+  // Serial.print(A_rate); 
 
   // Serial.print(" w cyc t:");
   // Serial.print(wanted_cycle_time);
@@ -1429,17 +1432,18 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
   // Serial.print(" P(mBar):");
   // Serial.println(pressure_abs);
 
-  // Serial.print(" RF:");
-  Serial.print(range_factor); 
-
-  Serial.print(", Index: ");
-  Serial.print(index);
-
-  Serial.print(", motorPWM: ");
-  Serial.print(motorPWM);
-
-  Serial.print(", Calibrated: ");
-  Serial.print(calibrated);
+  Serial.print("RF: ");                Serial.print(range_factor); 
+  Serial.print(", Index: ");           Serial.print(index);
+  Serial.print(", Feedback: ");        Serial.print(A_pot);
+  Serial.print(", wanted_pos: ");      Serial.print(wanted_pos);
+  Serial.print(", error: ");           Serial.print(error);
+  Serial.print(", integral: ");        Serial.println(integral);
+  
+  Serial.print("planned_vel: ");       Serial.print(planned_vel);
+  Serial.print(", wanted_vel_PWM: ");  Serial.print(wanted_vel_PWM);
+  Serial.print(", motorPWM: ");        Serial.print(motorPWM);
+//  Serial.print(", motion_failure: ");  Serial.print(motion_failure);
+  Serial.print(", Calibrated: ");      Serial.println(calibrated);
 
   Serial.println("");
 }

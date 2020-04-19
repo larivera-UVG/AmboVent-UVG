@@ -19,7 +19,8 @@
 // options for display and debug via serial com
 #define send_to_monitor 0     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemtry for debug
-#define DELTA_TELE_MONITOR 50  // Delta time (in ms) for displaying telemetry and info to monitor
+#define DELTA_TELE_MONITOR 23 // Para que no se despliegue tantas veces, y no siempre
+                              // se desplieguen los mismos índices.
 
 // UI
 #define deltaUD 5       // define the value change per each button press
@@ -43,13 +44,13 @@
 #if (full_configuration == 1) // Direct arm conection 
   #define LCD_available 1 
   #define pres_pot_available 1  // 1 if the system has 3 potentiometer and can control the inspirium pressure 
-  #define pin_SW2 4         // breath - On / Off / cal
-  #define pin_TST 2         // test mode - not in use
-  #define pin_RST 5         // reset alarm - not in use
-  #define pin_LED_AMP 13    // amplitude LED
-  #define pin_LED_FREQ 13   // frequency LED
+  #define pin_TST 4         // test mode - not in use
+  #define pin_SW2 5         // breath - On / Off / cal
+  #define pin_RST 6         // reset alarm - not in use
+  #define pin_USR 7         // User LED
+  #define pin_LED_AMP 8    // amplitude LED
+  #define pin_LED_FREQ 9   // frequency LED
   #define pin_LED_Fail 10   // FAIL and calib blue LED
-  #define pin_USR 9         // User LED
   #define pin_FD 13    // freq Down
   #define pin_FU 13    // freq Up
   #define pin_AD 13    // Amp Down
@@ -66,15 +67,15 @@
 // Other Arduino pins alocation
 
 // Pins for Motor Driver
-#define pin_PWM 3    // digital pin that sends the PWM to the motor
-#define INA    12    // VERIFICAR ESTE PUERTO
-#define INB    11    // VERIFICAR ESTE PUERTO
+#define pin_PWM  3   // digital pin that sends the PWM to the motor
+#define pin_INA 12   // Para el driver
+#define pin_INB 11   // Para el driver
 
 #define pin_POT A0   // analog pin of motion feedback potentiometer
-#define pin_FRQ A1   // analog pin of rate potentiometer control
-#define pin_AMP A2   // analog pin of amplitude potentiometer control
+#define pin_AMP A1   // analog pin of amplitude potentiometer control
+#define pin_FRQ A2   // analog pin of rate potentiometer control
 #define pin_PRE A3   // analog pin of pressure potentiometer control
-#define pin_CUR 6    // analog pin of current sense
+//#define pin_CUR 6    // analog pin of current sense
 
 // Talon SR or SPARK controller PWM settings ("angle" for Servo library)
 #define PWM_mid 93  // mid value for PWM 0 motion - higher pushes up
@@ -91,8 +92,7 @@
 // motor and sensor definitions
 #define invert_mot 0
 #define invert_pot 0
-//#define min_address 4
-//#define max_address 8
+
 
 #include <EEPROM.h>
 #include <Wire.h>    // Used for I2C
@@ -147,8 +147,8 @@ enum main_states state;
 void setup()
 {
   pinMode(pin_PWM, OUTPUT);
-  pinMode(INA, OUTPUT);  // For driver VNH5019A-E
-  pinMode(INB, OUTPUT);  // For driver VNH5019A-E
+  pinMode(pin_INA, OUTPUT);  // For driver VNH5019A-E
+  pinMode(pin_INB, OUTPUT);  // For driver VNH5019A-E
 
   pinMode(pin_FD, INPUT_PULLUP);
   pinMode(pin_FU, INPUT_PULLUP);
@@ -156,8 +156,8 @@ void setup()
   pinMode(pin_AU, INPUT_PULLUP);
   pinMode(pin_SW2, INPUT_PULLUP);
   pinMode(pin_TST, INPUT_PULLUP);
-//  pinMode(pin_LED_AMP, OUTPUT);
-//  pinMode(pin_LED_FREQ, OUTPUT);
+  pinMode(pin_LED_AMP, OUTPUT);
+  pinMode(pin_LED_FREQ, OUTPUT);
   pinMode(pin_LED_Fail, OUTPUT);
   pinMode(pin_USR, OUTPUT);
 
@@ -779,7 +779,7 @@ void read_IO()
   if(invert_pot)
     A_pot = 1023 - A_pot;
 
-  A_current = analogRead(pin_CUR)/8;  // in tenth Amps
+//  A_current = analogRead(pin_CUR)/8;  // in tenth Amps
 
   if(control_with_pot)
   { 
@@ -969,6 +969,8 @@ void LED_USR(byte val)
 void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
 {
   Serial.print("State: ");              Serial.println(state);
+  Serial.print("menu_state: ");         Serial.println(menu_state);
+  
   Serial.print("A_freq: ");             Serial.println(A_rate);
   Serial.print("Feedback: ");           Serial.println(A_pot);
   Serial.print("A_amplitude: ");        Serial.println(A_comp);

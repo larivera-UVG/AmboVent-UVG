@@ -120,3 +120,4 @@ xlabel('BPM');
 ylabel('Ciclo completo (s)');
 grid on;
 sgtitle(sprintf('Variable cycleTime = %d,   smear factor = %d', cycleTime, smear_factor));
+
