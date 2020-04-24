@@ -106,14 +106,14 @@ void loop()
 
     if(vel_actual < 0)
     {
-      digitalWrite(pin_INA, HIGH);
-      digitalWrite(pin_INB, LOW);
+      digitalWrite(pin_INA, LOW);
+      digitalWrite(pin_INB, HIGH);
       vel_actual = -vel_actual;
     }
     else
     {
-      digitalWrite(pin_INA, LOW);
-      digitalWrite(pin_INB, HIGH);
+      digitalWrite(pin_INA, HIGH);
+      digitalWrite(pin_INB, LOW);
     }
 
     motorPWM = (int)(vel_actual*255.0/25.0);  // 255, el 25 es el máximo valor absoluto del vector vel centrado.

@@ -46,14 +46,14 @@ void loop() {
 
   if(actual < 0)
   {
-    digitalWrite(INA, HIGH);
-    digitalWrite(INB, LOW);
+    digitalWrite(INA, LOW);
+    digitalWrite(INB, HIGH);
     actual = -actual;
   }
   else
   {
-    digitalWrite(INA, LOW);
-    digitalWrite(INB, HIGH);
+    digitalWrite(INA, HIGH);
+    digitalWrite(INB, LOW);
   }
 
   valor_PWM = int(actual*255.0/25.0);  // 255

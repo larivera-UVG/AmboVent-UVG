@@ -2,6 +2,8 @@
  AmboVent-UVG
  Based on the original code for the AmboVent (April 12, 2020)
 
+ CÓDIGO PARA PROBAR MÓDULOS/FUNCIONES QUE SE VAYAN AGREGANDO
+
 ***************** Key modifications *******************************************
  Pressure sensor: This version uses an Adafruit MPRLS pressure sensor (hPa),
  instead of the SparkFun MS5803 sensor (mbar).
@@ -222,7 +224,7 @@ byte SW2, prev_SW2, SW2temp, SW2_pressed, counter_SW2_ON, counter_SW2_OFF,
 
 byte insp_pressure, prev_insp_pressure, safety_pressure_counter, no_fail_counter,
      patient_triggered_breath, motion_time, progress,
-     telemetry_option = 0;
+     telemetry_option = 0, adjusting_PID = 0; //, PID_pots_aligned;
 
 int A_pot, prev_A_pot, A_current, Compression_perc = 80, prev_Compression_perc,
     A_rate, A_comp, A_pres;
@@ -372,6 +374,9 @@ void loop()
         state = MENU_STATE;
       }
 
+      if(motion_failure == 1 || RST_pressed == 1)
+        reset_failures();
+
       break;
 
     case BREATH_STATE:     // run profile
@@ -380,10 +385,17 @@ void loop()
       if(SW2_pressed)
         state = STBY_STATE;  // stop breathing motion
 
+      if(motion_failure == 1 || RST_pressed == 1)
+      {
+        reset_failures();
+        state = STBY_STATE;
+      }
+
       break;
 
     case MENU_STATE:     // maintanance menu
       display_menu();
+
       break;
   }
   
@@ -561,9 +573,10 @@ void display_menu()
 // Primero colocar los pots en la posición correspondiente a las
 // constantes actuales, para que no haya cambios bruscos.
             align_PID_pots();
-            //PID_pots_aligned = 1;
 
             telemetry_option = 0;
+            adjusting_PID = 1;
+
             read_IO();
 
             while(TST_pressed == 0)
@@ -573,11 +586,12 @@ void display_menu()
               read_IO();
             }
 
-            // Mejor guardar las constantes del PID en la EEPROM
+            // Save control constants to the EEPROM
             EEPROM.put(36, FF);                    delay(200);
             EEPROM.put(36 + sizeof(float), KP);    delay(200);
             EEPROM.put(36 + 2*sizeof(float), KI);  delay(200);
-            
+
+            adjusting_PID = 0;
             exit_menu();
           }
         }
@@ -1453,6 +1467,15 @@ void align_PID_pots()
 #endif
     }
   }
+
+#if LCD_available == 1
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Adjust FF KP KI");
+  lcd.setCursor(0, 1);
+  lcd.print("TEST when done");
+  delay(1000);
+#endif
 }
 
 // Function that reads the potentiometer values and changes
@@ -1609,29 +1632,40 @@ void read_IO()
 
   if(control_with_pot)
   {
-    A_rate = analogRead(pin_FRQ);
-    A_comp = analogRead(pin_AMP);
-    A_pres = analogRead(pin_PRE);
+    // When adjusting PID values, don't use pot values to adjust BPM, 
+    // Compression_perc and insp_pressure.
+    if(adjusting_PID == 0)
+    {
+      A_rate = analogRead(pin_FRQ);
+      A_comp = analogRead(pin_AMP);
+      A_pres = analogRead(pin_PRE);
 
-    if(abs(pot_rate - A_rate) < 5)
-      pot_rate = pot_alpha*pot_rate + (1 - pot_alpha)*A_rate;
+      if(abs(pot_rate - A_rate) < 5)
+        pot_rate = pot_alpha*pot_rate + (1 - pot_alpha)*A_rate;
+      else
+        pot_rate = A_rate;
+
+      if(abs(pot_comp - A_comp) < 5)
+        pot_comp = pot_alpha*pot_comp + (1 - pot_alpha)*A_comp;
+      else
+        pot_comp = A_comp;
+
+      if(abs(pot_pres - A_pres) < 5)
+        pot_pres = pot_alpha*pot_pres + (1 - pot_alpha)*A_pres;
+      else
+        pot_pres = A_pres;
+
+      A_rate = range_pot(int(pot_rate), rate_pot_low, rate_pot_high);
+      A_comp = range_pot(int(pot_comp), comp_pot_low, comp_pot_high);
+      A_pres = range_pot(int(pot_pres), pres_pot_low, pres_pot_high);
+    }
     else
-      pot_rate = A_rate;
+    {
+      A_rate = 800;  // BPM approx. 20
+      A_comp = 615;  // Compression_perc approx. 90
+      A_pres = 500;  // insp_pressure = 50
+    }
 
-    if(abs(pot_comp - A_comp) < 5)
-      pot_comp = pot_alpha*pot_comp + (1 - pot_alpha)*A_comp;
-    else
-      pot_comp = A_comp;
-
-    if(abs(pot_pres - A_pres) < 5)
-      pot_pres = pot_alpha*pot_pres + (1 - pot_alpha)*A_pres;
-    else
-      pot_pres = A_pres;
-
-    A_rate = range_pot(int(pot_rate), rate_pot_low, rate_pot_high);
-    A_comp = range_pot(int(pot_comp), comp_pot_low, comp_pot_high);
-    A_pres = range_pot(int(pot_pres), pres_pot_low, pres_pot_high);
- 
     Compression_perc = perc_of_lower_vol_display + int(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
     Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
 

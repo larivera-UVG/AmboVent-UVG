@@ -31,6 +31,7 @@
 
 #define perc_of_lower_volume_display 40
 
+#define invert_mot 0
 
 ////#include <EEPROM.h>
 #include <Wire.h>    // Used for I2C
@@ -147,7 +148,7 @@ void setup()
 #endif
 
   // Para empezar en el índice adecuado, según la posición del motor
-  index = map(pos_inicial, min_arm_pos, max_arm_pos, 0, profile_length);
+  index = map(pos_inicial, min_arm_pos, max_arm_pos, 0, profile_length-1);
 }
 
 void loop()
@@ -161,16 +162,19 @@ void loop()
     vel_actual = pgm_read_byte_near(vel + index) - 128;
 //    vel_actual = vel[index] - 128;
 
+  if(invert_mot)
+    vel_actual = -vel_actual;
+
     if(vel_actual < 0)
     {
-      digitalWrite(pin_INA, HIGH);
-      digitalWrite(pin_INB, LOW);
+      digitalWrite(pin_INA, LOW);
+      digitalWrite(pin_INB, HIGH);
       vel_actual = -vel_actual;
     }
     else
     {
-      digitalWrite(pin_INA, LOW);
-      digitalWrite(pin_INB, HIGH);
+      digitalWrite(pin_INA, HIGH);
+      digitalWrite(pin_INB, LOW);
     }
 
     motorPWM = (int)(vel_actual*255.0/MAX_VEL_CENTRADO);
