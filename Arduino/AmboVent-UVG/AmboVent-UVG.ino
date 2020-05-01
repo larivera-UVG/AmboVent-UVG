@@ -27,6 +27,7 @@
 
 #define DEBUG 0     // 1 para que forzar a |error| < ERROR_DEBUG
 #define ERROR_DEBUG 20
+#define INVERT_LEDS 1  // 1 if Leds turn ON with 0 (common anode)
 
 // system configuration
 #define full_configuration 1        // 1 is the default - full system.   0 is for partial system - potentiometer installed on pulley, no potentiometers, ...
@@ -36,7 +37,7 @@
 // options for display and debug via serial com
 #define send_to_monitor 1     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemetry for debugging
-#define DELTA_TELE_MONITOR 500  // Delta time (in ms) for displaying telemetry and info to monitor
+#define DELTA_TELE_MONITOR 250  // Delta time (in ms) for displaying telemetry and info to monitor
 
 // UI
 #define deltaUD 5       // define the value change per each button press
@@ -44,8 +45,8 @@
 
 // clinical
 // PROBAR DEJAR LOS SIGUIENTES DOS IGUALES, Y VARIARLOS AL MISMO TIEMPO.
-#define perc_of_lower_volume 50.0       // % of max press - defines lower volume  // 50.0
-#define perc_of_lower_vol_display 33.0  // % of max press - defines lower volume to display when reaching the real lower volume // 33.0
+#define perc_of_lower_volume 30.0       // % of max press - defines lower volume  // 50.0
+#define perc_of_lower_vol_display 30.0  // % of max press - defines lower volume to display when reaching the real lower volume // 33.0
 
 #define wait_time_after_resistance 3    // seconds to wait before re-attempt to push air after max pressure was achieved 
 #define max_pres_disconnected 10        // if the max pressure during breathing cycle does not reach this value - pipe is disconnected
@@ -66,8 +67,8 @@
   #define pin_TST 2   // test mode - not in use
   #define pin_LED_AMP 11   // amplitude LED
   #define pin_LED_FREQ 9   // frequency LED
-  #define pin_LED_Fail 10  // FAIL and calib blue LED
-  #define pin_USR 12  // User LED
+  #define pin_LED_FAIL 10  // FAIL and calib blue LED
+  #define pin_LED_USR 12  // User LED
   #define pin_FD 4    // freq Down
   #define pin_FU 5    // freq Up
   #define pin_AD 8    // Amp Down
@@ -88,10 +89,10 @@
   #define pin_TST 4         // test mode - not in use
   #define pin_SW2 5         // breath - On / Off / cal
   #define pin_RST 6         // reset alarm
-  #define pin_USR 7         // User LED
-  #define pin_LED_AMP 8    // amplitude LED
-  #define pin_LED_FREQ 9   // frequency LED
-  #define pin_LED_Fail 10   // FAIL and calib blue LED
+  #define pin_LED_USR  7         // User LED
+  #define pin_LED_FAIL 8   // FAIL and calib: red LED
+  #define pin_LED_FREQ 9   // frequency: green LED
+  #define pin_LED_AMP 10   // amplitude: blue LED
   #define pin_FD 13    // freq Down
   #define pin_FU 13    // freq Up
   #define pin_AD 13    // Amp Down
@@ -113,6 +114,9 @@
   #define KI_MAX 7
   #define KI_DEF 2                // motion control integral gain 2, 7
   #define DELTA_KI ((KI_MAX-KI_MIN)/100.0)
+
+  #define ADJ_V_MIN 0.5
+  #define ADJ_V_MAX 2.0
 
   #define integral_limit 5    // limits the integral of error 
   #define f_reduction_up_val 0.85    // reduce feedforward by this factor when moving up 
@@ -146,7 +150,9 @@
 #define cycleTime 10          // milisec
 #define alpha 0.95            // filter for current apatation - higher = stronger low pass filter
 #define profile_length 250    // motion control profile length
-#define motion_control_allowed_error  40  // % of range
+#define motion_control_allowed_error  40  // % of range 30, 40
+
+#define N_adj 15  // Size of adjustment vector for wanted_pos
 
 // motor and sensor definitions
 #define invert_mot 0  // Cuidado con esto. Ver notas en
@@ -188,9 +194,11 @@ const PROGMEM byte pos[profile_length] =
      222,218,214,210,206,202,198,193,189,184,180,175,171,166,162,157,152,148,143,138,
      134,129,124,120,115,111,106,102, 97, 93, 89, 84, 80, 76, 72, 68, 64, 61, 57, 54,
       50, 47, 44, 41, 38, 36, 33, 31, 29, 27, 25, 23, 22, 20, 19, 17, 16, 15, 13, 12,
-      11, 10,  9,  8,  7,  6,  6,  5,  4,  3,  3,  2,  2,  1,  1,  1,  0,  0,  0,  1,
-       1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  1,  1,  1,  1,  1,
-       1,  1,  1,  0,  0,  0,  0,  0,  0,  0};
+      11, 10,  9,  8,  7,  6,  6,  5,  4,  3,  3,  2,  2,  1,  1,  1,  0,  0,  0,  0,
+       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+       0,  0,  0,  0,  0,  0,  0,  0,  0,  0};
+//       1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  1,  1,  1,  1,  1,
+//       1,  1,  1,  0,  0,  0,  0,  0,  0,  0};
 
 const PROGMEM byte vel[profile_length] =
     {129,132,134,136,137,139,140,141,142,143,143,144,144,145,146,146,146,147,147,147,
@@ -204,12 +212,13 @@ const PROGMEM byte vel[profile_length] =
      105,105,105,105,105,105,106,106,106,107,107,107,108,108,109,109,110,110,111,111,
      112,113,113,114,115,116,117,118,118,119,119,120,120,120,121,121,121,122,122,122,
      123,123,123,124,124,124,124,125,125,125,125,125,126,126,126,126,126,127,127,127,
-     127,127,127,127,128,128,128,128,128,128,128,128,128,128,128,128,129,129,129,129,
-     129,129,129,129,129,128,128,128,128,128};
+     127,127,127,127,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
+     128,128,128,128,128,128,128,128,128,128};
+//     129,129,129,129,129,128,128,128,128,128};
 
 byte FD, FU, AD, AU, prev_FD, prev_FU, prev_AD, prev_AU,
      LED_status, USR_status, blueOn, calibrated = 0, calibON, numBlinkFreq,
-     menu_state, manual_mov_enabled = 0, PID_calib_enabled = 0;
+     menu_state, manual_mov_enabled = 0, CONFIG_enabled = 0;
 
 byte monitor_index = 0, BPM = 14, prev_BPM, in_wait, failure, send_beep,
      wanted_cycle_time, disconnected = 0, high_pressure_detected = 0,
@@ -222,7 +231,7 @@ byte SW2, prev_SW2, SW2temp, SW2_pressed, counter_SW2_ON, counter_SW2_OFF,
 
 byte insp_pressure, prev_insp_pressure, safety_pressure_counter, no_fail_counter,
      patient_triggered_breath, motion_time, progress,
-     telemetry_option = 0;
+     telemetry_option = 0, adjusting_params = 0, save_cancelled = 0;
 
 int A_pot, prev_A_pot, A_current, Compression_perc = 80, prev_Compression_perc,
     A_rate, A_comp, A_pres;
@@ -243,6 +252,14 @@ float wanted_pos, wanted_vel_PWM, range, range_factor, profile_planned_vel,
       wanted_manual_vel_PWM;
 
 float FF = FF_DEF, KP = KP_DEF, KI = KI_DEF, FF_temp, KP_temp, KI_temp;
+
+// For the adjustment vector (wanted_pos)
+float adj_v[N_adj] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+float adj_v_temp[N_adj];
+byte adj_ind;
+byte Compression_perc_v[N_adj] = {30, 35, 40, 45, 50, 55, 60, 65,
+                                  70, 75, 80, 85, 90, 95, 99};
 
 enum main_states:byte {STBY_STATE, BREATH_STATE, MENU_STATE};
 enum main_states state;
@@ -267,8 +284,8 @@ void setup()
 
   pinMode(pin_LED_AMP, OUTPUT);
   pinMode(pin_LED_FREQ, OUTPUT);
-  pinMode(pin_LED_Fail, OUTPUT);
-  pinMode(pin_USR, OUTPUT);
+  pinMode(pin_LED_FAIL, OUTPUT);
+  pinMode(pin_LED_USR, OUTPUT);
 
 //  motor.attach(pin_PWM);
   Serial.begin(115200);
@@ -290,7 +307,7 @@ void setup()
 #endif
 
 #if central_monitor_system==1
-  for (i = 0; i < 100; i++) 
+  for(i = 0; i < 100; i++)
   {
     UniqueIDdump(Serial);  
     delay(100); 
@@ -298,6 +315,8 @@ void setup()
 #endif
 
   state = STBY_STATE;
+
+// --- Get parameters from EEPROM ---------------------------------------------
   EEPROM.get(4, min_arm_pos);     delay(20);
   EEPROM.get(8, max_arm_pos);     delay(20);
   EEPROM.get(12, comp_pot_low);   delay(20);
@@ -323,10 +342,15 @@ void setup()
   if(KI < KI_MIN || KI > KI_MAX || isnan(KI) == 1)
     KI = KI_DEF;
 
-// TEMPORAL, PARA FORZAR LAS POSICIONES EXTREMAS DEL BRAZO
-//   min_arm_pos = 150;
-//   max_arm_pos = 600;
-// -------------------------------------------------------
+  for(i = 0; i < N_adj; i++)
+  {
+    EEPROM.get(36 + (3+i)*sizeof(float), adj_v[i]);
+    delay(20);
+
+    if(adj_v[i] <= 0.0 || adj_v[i] > 3.0 || isnan(adj_v[i]))
+      adj_v[i] = 1.0;
+  }
+// ----------------------------------------------------------------------------
 
   insp_pressure = insp_pressure_default;
   patient_triggered_breath = patient_triggered_breath_def;
@@ -372,6 +396,14 @@ void loop()
         state = MENU_STATE;
       }
 
+      if(motion_failure == 1 && RST_pressed == 1)
+      {
+        reset_failures();
+#if LCD_available == 1
+        display_LCD();
+#endif
+      }
+
       break;
 
     case BREATH_STATE:     // run profile
@@ -380,10 +412,20 @@ void loop()
       if(SW2_pressed)
         state = STBY_STATE;  // stop breathing motion
 
+      if(motion_failure == 1 && RST_pressed == 1)
+      {
+        reset_failures();
+#if LCD_available == 1
+        display_LCD();
+#endif
+        state = STBY_STATE;
+      }
+
       break;
 
     case MENU_STATE:     // maintanance menu
       display_menu();
+
       break;
   }
   
@@ -402,11 +444,8 @@ void loop()
 
 void display_menu()
 {
-  // ¿No será mejor mapear de rate_pot_low, rate_pot_high a 0, 9?
-//  menu_state = map(pot_rate, 0, 1023, 0, 9);
-  menu_state = map(pot_rate, rate_pot_low, rate_pot_high, 0, 9);
-
-  menu_state = constrain(menu_state, 0, 9);
+  menu_state = map(pot_rate, 0, 1023, 0, 10);  // pot_rate está entre 0 y 1023
+  menu_state = constrain(menu_state, 0, 10);
 
   switch(menu_state)
   {
@@ -479,7 +518,6 @@ void display_menu()
         {
           read_IO();
 
-          // ¿No será mejor mapear de rate_pot_low, rate_pot_high a 25, 50?
           motion_time = map(pot_rate, 0, 1023, 25, 50);
           motion_time = constrain(motion_time, 25, 50);
 
@@ -537,57 +575,129 @@ void display_menu()
         {
           telemetry_option = 1;
           move_arm_with_pot();
+
+          delay(500);
           exit_menu();
         }
       }
       else
       {
-        display_text_2_lines("Man Mov Disbld.", "Press TEST ");
+        display_text_2_lines("Man Mov Disbld.", "Press TEST");
 
         if(TST_pressed)
+        {
+          delay(100);
           exit_menu();
+        }
       }
 
       break;
 
     case 8:    // PID calibration, if enabled
-       if(PID_calib_enabled)
-       {
-          display_text_2_lines("PID Calib ", "TEST to start");
+      if(CONFIG_enabled)
+      {
+        display_text_2_lines("PID Calib ", "TEST to start");
 
-          if(TST_pressed)
-          {
-            telemetry_option = 2;
+        if(TST_pressed)
+        {
+          telemetry_option = 2;
 // Primero colocar los pots en la posición correspondiente a las
 // constantes actuales, para que no haya cambios bruscos.
-            align_PID_pots();
-            //PID_pots_aligned = 1;
+          align_PID_pots();
 
-            telemetry_option = 0;
+          telemetry_option = 0;
+          adjusting_params = 1;
+          save_cancelled = 0;
+
+          read_IO();
+
+          // Save the values, in case the process is cancelled
+          FF_temp = FF;
+          KP_temp = KP;
+          KI_temp = KI;
+
+          while(TST_pressed == 0)
+          {
+            set_PID_constants();
+            run_profile_func();
             read_IO();
 
-            while(TST_pressed == 0)
+            if(RST_pressed == 1)
             {
-              set_PID_constants();
-              run_profile_func();
-              read_IO();
+              save_cancelled = 1;
+              break;
             }
+          }
 
-            // Mejor guardar las constantes del PID en la EEPROM
+          if(save_cancelled == 0)
+          {
+            // Save control constants to the EEPROM
             EEPROM.put(36, FF);                    delay(200);
             EEPROM.put(36 + sizeof(float), KP);    delay(200);
             EEPROM.put(36 + 2*sizeof(float), KI);  delay(200);
-            
-            exit_menu();
           }
-        }
-        else
-        {
-          display_text_2_lines("PID Cal Disbld.", "Press TEST ");
+          else  // if the process was cancelled
+          {
+            delay(100);
+            display_text_2_lines("PID Calibration", "Cancelled");
 
-          if(TST_pressed)
-            exit_menu();
+            // Put the former values back
+            FF = FF_temp;
+            KP = KP_temp;
+            KI = KI_temp;
+
+            delay(1000);
+          }
+
+          adjusting_params = 0;
+          exit_menu();
         }
+      }
+      else
+      {
+        display_text_2_lines("PID Cal Disbld.", "Press TEST ");
+
+        if(TST_pressed)
+        {
+          delay(100);
+          exit_menu();
+        }
+      }
+
+      break;
+
+
+    case 9:    // Volume adjustment vector calibration, if enabled
+      if(CONFIG_enabled)
+      {
+        display_text_2_lines("Adj_v Calib", "TEST to start");
+
+        if(TST_pressed)
+        {
+          telemetry_option = 3;
+          adjusting_params = 2;
+          save_cancelled = 0;
+          delay(100);  // give some time for TST_pressed to change back to 0
+
+          read_IO();
+
+          adj_v_module();
+
+          telemetry_option = 0;
+          adjusting_params = 0;
+          exit_menu();
+        }
+      }
+      else
+      {
+        display_text_2_lines("Adj_v Cal Disbld", "Press TEST ");
+
+        if(TST_pressed)
+        {
+          delay(100);
+          exit_menu();
+        }
+      }
 
       break;
 
@@ -623,6 +733,7 @@ void exit_menu()
 // setting the corresponding PWM.
 void run_profile_func()
 {
+  // wanted_cycle_time: time between index changes
   if(millis() - lastIndex >= wanted_cycle_time) // do when cycle time was reached
   {
     cycles_lost = (millis() - lastIndex)/wanted_cycle_time - 1;
@@ -676,6 +787,7 @@ void run_profile_func()
 #endif
       }
 
+      // breath_cycle_time: time to complete an entire breathing cycle
       if(millis() - start_wait < breath_cycle_time)
       {
         index = profile_length - 2;
@@ -702,12 +814,18 @@ void calculate_wanted_pos_vel()
   vel_from_profile = pgm_read_byte_near(vel + index + 1);
 
   range = range_factor*(max_arm_pos - min_arm_pos);  // range of movement in pot' readings
-  
-// AQUÍ INCLUIR LO DEL VECTOR DE PESOS, PARA AJUSTAR MEJOR
-// EL VOLUMEN DE COMPRESIÓN. DE REPENTE UNOS 20 PUNTOS.
 
-  wanted_pos = float(pos_from_profile)*range/255 + min_arm_pos;  // wanted pos in pot clicks
-  profile_planned_vel = (float(vel_from_profile) - 128.01)*range/255;  // in clicks per 0.2 second
+// Adjust the wanted_pos vector, according to the adj_v values, which
+// are calibrated to match the actual volumes corresponding to the
+// compression_perc.
+  adj_ind = map(Compression_perc, int(perc_of_lower_volume), 99, 0, N_adj-1);
+  adj_ind = constrain(adj_ind, 0, N_adj-1);
+
+  // wanted pos in pot clicks
+  wanted_pos = adj_v[adj_ind]*float(pos_from_profile)*range/255 + min_arm_pos;
+
+  // vel in clicks per 0.2? second
+  profile_planned_vel = (float(vel_from_profile) - 128.01)*range/255;
 
   planned_vel = profile_planned_vel;
 
@@ -1344,6 +1462,7 @@ void store_prev_values()
   prev_AU = AU;
   prev_SW2 = SW2;
   prev_TST = TST;
+  prev_RST = RST;
   prev_BPM = BPM;
   prev_A_pot = A_pot;
   prev_Compression_perc = Compression_perc;
@@ -1453,6 +1572,15 @@ void align_PID_pots()
 #endif
     }
   }
+
+#if LCD_available == 1
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Adjust FF KP KI");
+  lcd.setCursor(0, 1);
+  lcd.print("TEST when done");
+  delay(1000);
+#endif
 }
 
 // Function that reads the potentiometer values and changes
@@ -1488,6 +1616,98 @@ void set_PID_constants()
   }
 }
 
+
+void adj_v_module()
+{
+  // Save the values, in case the process is cancelled
+  for(i = 0; i < N_adj; i++)
+    adj_v_temp[i] = adj_v[i];
+
+  for(i = 0; i < N_adj; i++)
+  {
+    Compression_perc = (int)(Compression_perc_v[i]);
+
+    read_IO();
+
+    while(TST_pressed == 0)
+    {
+      set_adj_v_values();
+      run_profile_func();
+
+// !!! VER POR QUÉ NO AVANZA LUEGO DEL PRIMER VOLUMEN...
+// POR ALGUNA RAZÓN SE SALE. ¿motion_fail afectando?
+// --> DE REPENTE CON UN DELAY
+// PONER LOS MENSAJES DE TELEMETRÍA CORRESPONDIENTES A LA OPCIÓN 3
+
+      read_IO();
+
+      if(RST_pressed == 1)
+      {
+        save_cancelled = 1;
+        break;
+      }
+
+      if(millis() - last_sent_data > DELTA_TELE_MONITOR)
+      { 
+        if(telemetry == 1)
+          print_tele();
+
+        last_sent_data = millis();
+      }
+    }
+
+    if(save_cancelled == 1)
+      break;
+
+    delay(100);  // give some time for TST_pressed to change back to 0
+  }
+
+  if(save_cancelled == 0)
+  {
+  // Save adjustment vector values to the EEPROM
+    for(i = 0; i < N_adj; i++)
+    {
+      EEPROM.put(36 + (3+i)*sizeof(float), adj_v[i]);
+      delay(200);
+    }
+  }
+  else  // if the process was cancelled
+  {
+    delay(100);
+    display_text_2_lines("Adj_v Calib.", "Cancelled");
+
+    // Put the former values back
+    for(i = 0; i < N_adj; i++)
+      adj_v[i] = adj_v_temp[i];
+
+    delay(1000);
+  }
+}
+
+// Function that reads the AMP potentiometer value and changes
+// the current adj_v accordingly.
+// Variables i and Compression_perc are being changed in 
+void set_adj_v_values()
+{
+  adj_v[i] = (ADJ_V_MAX - ADJ_V_MIN)*1.0*(analogRead(pin_AMP) - 
+          comp_pot_low)/(1.0*(comp_pot_high - comp_pot_low)) + ADJ_V_MIN;
+  adj_v[i] = constrain(adj_v[i], ADJ_V_MIN, ADJ_V_MAX);
+
+  if(millis() - lastUSRblink > 100)
+  {
+    lastUSRblink = millis();
+#if LCD_available == 1
+    lcd.setCursor(0, 0);
+    lcd.print("Comp per: ");
+    lcd.print(Compression_perc);
+    lcd.setCursor(0, 1);
+    lcd.print("adj_value: ");
+    lcd.print((float)(adj_v[i]));
+#endif
+  }
+}
+
+
 // Function that reads the status of User Interface (buttons, pots, etc.),
 // and updates the corresponding global variables (parameters, alarms, etc).
 void read_IO()
@@ -1495,9 +1715,9 @@ void read_IO()
   store_prev_values();
 
 //  manual_mov_enabled = digitalRead(pin_CONFIG);
-//  PID_calib_enabled = digitalRead(pin_CONFIG);
+//  CONFIG_enabled = digitalRead(pin_CONFIG);
   manual_mov_enabled = 1;
-  PID_calib_enabled = 1;
+  CONFIG_enabled = 1;  // for both PID and adj_v calibration
 
   TSTtemp = (1 - digitalRead(pin_TST));
   SW2temp = (1 - digitalRead(pin_SW2));
@@ -1609,31 +1829,45 @@ void read_IO()
 
   if(control_with_pot)
   {
-    A_rate = analogRead(pin_FRQ);
-    A_comp = analogRead(pin_AMP);
-    A_pres = analogRead(pin_PRE);
+    // When adjusting PID values, or adj_v values, don't use pot values
+    // to adjust BPM, Compression_perc and insp_pressure.
+    if(adjusting_params != 1)  // NO PID adjustment being done
+    {
+      A_rate = analogRead(pin_FRQ);
+      A_comp = analogRead(pin_AMP);
+      A_pres = analogRead(pin_PRE);
 
-    if(abs(pot_rate - A_rate) < 5)
-      pot_rate = pot_alpha*pot_rate + (1 - pot_alpha)*A_rate;
-    else
-      pot_rate = A_rate;
+      if(abs(pot_rate - A_rate) < 5)
+        pot_rate = pot_alpha*pot_rate + (1 - pot_alpha)*A_rate;
+      else
+        pot_rate = A_rate;
 
-    if(abs(pot_comp - A_comp) < 5)
-      pot_comp = pot_alpha*pot_comp + (1 - pot_alpha)*A_comp;
-    else
-      pot_comp = A_comp;
+      if(abs(pot_comp - A_comp) < 5)
+        pot_comp = pot_alpha*pot_comp + (1 - pot_alpha)*A_comp;
+      else
+        pot_comp = A_comp;
 
-    if(abs(pot_pres - A_pres) < 5)
-      pot_pres = pot_alpha*pot_pres + (1 - pot_alpha)*A_pres;
-    else
-      pot_pres = A_pres;
+      if(abs(pot_pres - A_pres) < 5)
+        pot_pres = pot_alpha*pot_pres + (1 - pot_alpha)*A_pres;
+      else
+        pot_pres = A_pres;
 
-    A_rate = range_pot(int(pot_rate), rate_pot_low, rate_pot_high);
-    A_comp = range_pot(int(pot_comp), comp_pot_low, comp_pot_high);
-    A_pres = range_pot(int(pot_pres), pres_pot_low, pres_pot_high);
- 
-    Compression_perc = perc_of_lower_vol_display + int(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
-    Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
+      A_rate = range_pot(int(pot_rate), rate_pot_low, rate_pot_high);
+      A_comp = range_pot(int(pot_comp), comp_pot_low, comp_pot_high);
+      A_pres = range_pot(int(pot_pres), pres_pot_low, pres_pot_high);
+    }
+    else  // Adjusting PID parameters
+    {
+      A_rate = 800;  // BPM approx. 20
+      A_comp = 615;  // Compression_perc approx. 90
+      A_pres = 500;  // insp_pressure = 50
+    }
+
+    if(adjusting_params != 2)  // Adj_v NOT being calibrated
+    {
+      Compression_perc = perc_of_lower_vol_display + int(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
+      Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
+    }
 
     BPM = 6 + (A_rate - 23)/55;       // 0 is 6 breaths per minute, 1023 is 24 BPM
     breath_cycle_time = 60000/BPM + 100;  // in milisec
@@ -1808,29 +2042,42 @@ void send_data_to_monitor()
 
 void LED_FREQ(byte val)
 {
-  digitalWrite(pin_LED_FREQ, val);
+  if(INVERT_LEDS)
+    digitalWrite(pin_LED_FREQ, 1 - val);
+  else
+    digitalWrite(pin_LED_FREQ, val);
 }
 
 void LED_AMP(byte val)
 {
-  digitalWrite(pin_LED_AMP, val);
+  if(INVERT_LEDS)
+    digitalWrite(pin_LED_AMP, 1 - val);
+  else
+    digitalWrite(pin_LED_AMP, val);
 }
 
 void LED_FAIL(byte val)
 {
-  digitalWrite(pin_LED_Fail, val);
+  if(INVERT_LEDS)
+    digitalWrite(pin_LED_FAIL, 1 - val);
+  else
+    digitalWrite(pin_LED_FAIL, val);
 }
 
 void LED_USR(byte val)
 {
-  digitalWrite(pin_USR, val);
+  if(INVERT_LEDS)
+    digitalWrite(pin_LED_USR, 1 - val);
+  else
+    digitalWrite(pin_LED_USR, val);
 }
 
 void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
 {
   if(telemetry_option == 0)
   {
-    Serial.print("Fail (disc, motion, hiPres): ");
+    Serial.print("State: "); Serial.print(state);
+    Serial.print(", Fail (disc, motion, hiPres): ");
     Serial.print(disconnected);
     Serial.print(", ");
     Serial.print(motion_failure);
@@ -1845,17 +2092,14 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.print(", ");
     Serial.println(max_arm_pos);
 
+    // Serial.print("Vol pot: ");           Serial.print(A_comp);
+    // Serial.print(", BPM pot:");          Serial.print(A_rate);
+    // Serial.print(", Pressure pot:");     Serial.print(A_pres);
+    // Serial.print(", w cyc t:");          Serial.print(wanted_cycle_time);
+    // Serial.println("");
+
     // Serial.print(" cur:");
-    // Serial.print(A_current); 
-
-    // Serial.print(" amp:");
-    // Serial.print(A_amplitude); 
-
-    // Serial.print(", freq:");
-    // Serial.print(A_rate); 
-
-    // Serial.print(" w cyc t:");
-    // Serial.print(wanted_cycle_time);
+    // Serial.print(A_current);
 
     Serial.print("Curr. Press.: ");      Serial.print(adafruitPress.readPressure());
     Serial.print(", P. baseline: ");     Serial.print(pressure_baseline);
@@ -1876,21 +2120,25 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.print(", Calibrated: ");      Serial.print(calibrated);
     Serial.println("");
 
-    Serial.print("FF: ");               Serial.print(FF);
-    Serial.print(", KP: ");             Serial.print(KP);
-    Serial.print(", KI: ");             Serial.print(KI);
+    Serial.print("FF: ");                Serial.print(FF);
+    Serial.print(", KP: ");              Serial.print(KP);
+    Serial.print(", KI: ");              Serial.print(KI);
     Serial.println("");
 
-/*
-    Serial.print("TSTtemp: ");           Serial.print(TSTtemp);
-    Serial.print(", TST_pressed: ");     Serial.print(TST_pressed);
-    Serial.print(", SW2temp: ");         Serial.print(SW2temp);
-    Serial.print(", SW2_pressed: ");     Serial.print(SW2_pressed);
-    Serial.print(", RSTtemp: ");         Serial.print(RSTtemp);
-    Serial.print(", RST_pressed: ");     Serial.println(RST_pressed);
-*/
+    Serial.print("Compression_perc: ");  Serial.print(Compression_perc);
+    Serial.print(", adj_ind: ");         Serial.print(adj_ind);
+    Serial.print(", adj_v: ");           Serial.print(adj_v[adj_ind]);
+    Serial.println("");
+
+//    Serial.print("TSTtemp: ");           Serial.print(TSTtemp);
+//    Serial.print(", TST_pressed: ");     Serial.print(TST_pressed);
+//    Serial.print(", SW2temp: ");         Serial.print(SW2temp);
+//    Serial.print(", SW2_pressed: ");     Serial.print(SW2_pressed);
+//    Serial.print(", RSTtemp: ");         Serial.print(RSTtemp);
+//    Serial.print(", RST_pressed: ");     Serial.println(RST_pressed);
   }
 
+// Manual Movement
   if(telemetry_option == 1)
   {
     Serial.print("Feedback: ");          Serial.print(A_pot);
@@ -1898,6 +2146,27 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.print(", error: ");           Serial.print(error);
     Serial.print(", wanted_manual_vel_PWM: ");  Serial.print(wanted_manual_vel_PWM);
     Serial.print(", motorPWM: ");        Serial.println(motorPWM);
+  }
+
+// PID Calibration
+  if(telemetry_option == 2)
+  {
+    Serial.print("Current FF: ");        Serial.print(FF);
+    Serial.print(", FF_temp: ");         Serial.println(FF_temp);
+    Serial.print("Current KP: ");        Serial.print(KP);
+    Serial.print(", KP_temp: ");         Serial.println(KP_temp);
+    Serial.print("Current KI: ");        Serial.print(KI);
+    Serial.print(", KI_temp: ");         Serial.println(KI_temp);
+  }
+
+// Adjustment_vector Calibration
+  if(telemetry_option == 3)
+  {
+    Serial.print("i: ");                   Serial.print(i);
+    Serial.print(", Compression_perc: ");  Serial.print(Compression_perc);
+    Serial.print(", adj_v[i]: ");          Serial.println(adj_v[i]);
+    Serial.print("BPM: ");                 Serial.print(BPM);
+    Serial.print(", insp_pressure: ");     Serial.print(insp_pressure);
   }
 
   Serial.println("");
