@@ -1,3 +1,5 @@
+#include <EEPROM.h>
+
 #define INVERT_LEDS 1
 
 #define pin_LED_USR 7    // User LED
@@ -10,6 +12,16 @@ void setup() {
   pinMode(pin_LED_AMP, OUTPUT);
   pinMode(pin_LED_FREQ, OUTPUT);
   pinMode(pin_LED_FAIL, OUTPUT);
+
+// Guardar valores por defecto en la EEPROM. Útil para cuando nunca se había hecho ---
+  int i;
+  for(i = 0; i < 15; i++)
+  {
+    byte adj_val = 100;
+    EEPROM.put(36 + 3*sizeof(float) + i*sizeof(byte), adj_val);
+    delay(200);
+  }
+// -----------------------------------------------------------------------------------
 
   Serial.begin(115200);
 }

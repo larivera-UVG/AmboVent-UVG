@@ -34,6 +34,7 @@
 #define COMP_PUSHBACK 50 // PUEDE VARIAR, SEGÚN EL AMBU USADO
 
 // system configuration
+#define full_configuration 1        // 1 is the default - full system.   0 is for partial system - potentiometer installed on pulley, no potentiometers, ...
 #define pressure_sensor_available 1 // 1 - you have installed an I2C pressure sensor 
 #define central_monitor_system 0    // 1 - send unique ID for 10 seconds upon startup, 0 - dont
 
@@ -63,52 +64,80 @@
 #define delta_pres_patient_inhale 5     // in cmH2O
 #define alpha_pres 0.98                 // used to average the pressure during the PEEP plateu
 
-#define LCD_available 1 
-#define pres_pot_available 1  // 1 if the system has 3 potentiometer and can control the inspirium pressure 
-#define pin_TST 4         // test mode - not in use
-#define pin_SW2 5         // breath - On / Off / cal
-#define pin_RST 6         // reset alarm
-#define pin_LED_USR  7    // User LED
-#define pin_LED_FAIL 8    // FAIL and calib: red LED
+
+#if (full_configuration == 0)  // Arm connected with strip or wire
+  #define LCD_available 0 
+  #define pres_pot_available 0  // 1 if the system has 3 potentiometer and can control the inspirium pressure 
+  #define pin_SW2 7   // breath - On / Off / cal
+  #define pin_TST 2   // test mode - not in use
+  #define pin_LED_AMP 11   // amplitude LED
+  #define pin_LED_FREQ 9   // frequency LED
+  #define pin_LED_FAIL 10  // FAIL and calib blue LED
+  #define pin_LED_USR 12  // User LED
+  #define pin_FD 4    // freq Down
+  #define pin_FU 5    // freq Up
+  #define pin_AD 8    // Amp Down
+  #define pin_AU 6    // Amp Up
+  #define curr_sense 1 
+  #define control_with_pot 1    // 1 = control with potentiometers  0 = with push buttons
+  #define FF 0.6      // motion control feed forward  
+  #define KP 0.2      // motion control propportional gain 
+  #define KI 2        // motion control integral gain 
+  #define integral_limit 6  // limits the integral of error 
+  #define f_reduction_up_val 0.65   // reduce feedforward by this factor when moving up
+
+#endif
+
+#if (full_configuration == 1) // Direct arm conection 
+  #define LCD_available 1 
+  #define pres_pot_available 1  // 1 if the system has 3 potentiometer and can control the inspirium pressure 
+  #define pin_TST 4         // test mode - not in use
+  #define pin_SW2 5         // breath - On / Off / cal
+  #define pin_RST 6         // reset alarm
+  #define pin_LED_USR  7    // User LED
+  #define pin_LED_FAIL 8    // FAIL and calib: red LED
 //  #define pin_LED_FREQ 9    // frequency: green LED
 //  #define pin_LED_AMP 10    // amplitude: blue LED
 
-// !! REVISAR EL PIN QUE SE USARÁ
-#define pin_BUZZER 9
+// ¡¡REVISAR EL PIN QUE SE USARÁ!!
+  #define pin_BUZZER 9
 
-// For Electrovalves !! CAMBIAR A LOS PINES QUE SE USARÁN
-#define pin_EVALV1 10       // Electrovalve 1
-#define pin_EVALV2 10       // Electrovalve 2
-#define pin_EVALV1_STAT 13  // Electrovalve 1 satus
-#define pin_EVALV2_STAT 13  // Electrovalve 2 status
+// For Electrovalves ¡¡CAMBIAR A LOS PINES QUE SE USARÁN!!
+  #define pin_EVALV1 10       // Electrovalve 1
+  #define pin_EVALV2 10       // Electrovalve 2
+  #define pin_EVALV1_STAT 13  // Electrovalve 1 satus
+  #define pin_EVALV2_STAT 13  // Electrovalve 2 status
 
-#define curr_sense 0
+  #define curr_sense 0
+  #define control_with_pot 1  // 1 = control with potentiometers, 0 = with push buttons
 
-#define MIN_ARM_POS_DEF 150
-#define MAX_ARM_POS_DEF 550
+  #define MIN_ARM_POS_DEF 150
+  #define MAX_ARM_POS_DEF 550
 
-#define FF_MIN 0.05
-#define FF_MAX 3
-#define FF_DEF 1              // motion control feed forward. 0.6, 4.5
-#define DELTA_FF ((FF_MAX-FF_MIN)/100.0)
+  #define FF_MIN 0.05
+  #define FF_MAX 3
+  #define FF_DEF 1              // motion control feed forward. 0.6, 4.5
+  #define DELTA_FF ((FF_MAX-FF_MIN)/100.0)
 
-#define KP_MIN 0.05
-#define KP_MAX 1.5
-#define KP_DEF 0.2              // motion control propportional gain 0.2, 1.2
-#define DELTA_KP ((KP_MAX-KP_MIN)/100.0)
+  #define KP_MIN 0.05
+  #define KP_MAX 1.5
+  #define KP_DEF 0.2              // motion control propportional gain 0.2, 1.2
+  #define DELTA_KP ((KP_MAX-KP_MIN)/100.0)
 
-#define KI_MIN 0.1
-#define KI_MAX 7
-#define KI_DEF 3                // motion control integral gain 2, 7
-#define DELTA_KI ((KI_MAX-KI_MIN)/100.0)
+  #define KI_MIN 0.1
+  #define KI_MAX 7
+  #define KI_DEF 3                // motion control integral gain 2, 7
+  #define DELTA_KI ((KI_MAX-KI_MIN)/100.0)
 
-#define ADJ_V_MIN  10  // 0.5
-#define ADJ_V_MAX 200  // 2.0
+  #define ADJ_V_MIN  10  // 0.5
+  #define ADJ_V_MAX 200  // 2.0
 
-#define integral_limit 5    // limits the integral of error 
-#define f_reduction_up_val 0.85    // reduce feedforward by this factor when moving up 
+  #define integral_limit 5    // limits the integral of error 
+  #define f_reduction_up_val 0.85    // reduce feedforward by this factor when moving up 
+#endif
 
 // Other Arduino pins alocation
+
 // Pins for Motor Driver
 #define pin_PWM  3    // digital pin that sends the PWM to the motor
 #define pin_INA 12    // Para el driver
@@ -198,60 +227,31 @@ const PROGMEM byte vel[profile_length] =
      127,127,127,127,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
      128,128,128,128,128,128,128,128,128,128};
 
-// Alarms: disconnected, motion_failure, high_pressure_detected,
-//         safety_pressure_detected, patient_triggered_breath,
-//         in_wait, hold_breath
-byte Alarms;
-#define disconnected              7
-#define motion_failure            6
-#define high_pressure_detected    5
-#define safety_pressure_detected  4
-#define patient_triggered_breath  3
-#define in_wait                   2
-#define hold_breath               1
+// Lógicas (que eran byte): USR_status, calibrated = 0, manual_mov_enabled = 0
+//    CONFIG_enabled = 0, in_wait, send_beep, disconnected = 0,
+//    high_pressure_detected = 0, motion_failure = 0, sent_LCD, hold_breath,
+//    safety_pressure_detected, patient_triggered_breath, progress
+//    save_cancelled = 0
+//    SW2, prev_SW2, SW2temp, SW2_pressed
+//    TST, prev_TST, TSTtemp, TST_pressed
+//    RST, prev_RST, RSTtemp, RST_pressed
 
-// Status: USR_status, calibrated, manual_mov_enabled, CONFIG_enabled,
-//         save_cancelled, progress, send_beep, sent_LCD
-byte Status;
-#define USR_status                7
-#define calibrated                6
-#define manual_mov_enabled        5
-#define CONFIG_enabled            4
-#define save_cancelled            3
-#define progress                  2
-#define send_beep                 1
-#define sent_LCD                  0
+//byte FD, FU, AD, AU, prev_FD, prev_FU, prev_AD, prev_AU;
+byte LED_status, USR_status, blueOn, calibrated = 0, calibON, numBlinkFreq,
+     menu_state, manual_mov_enabled = 0, CONFIG_enabled = 0;
 
-// Buttons1: SW2, prev_SW2, SW2temp, SW2_pressed
-//           TST, prev_TST, TSTtemp, TST_pressed
-// Buttons2: RST, prev_RST, RSTtemp, RST_pressed
-byte Buttons1;
-#define SW2                       7
-#define prev_SW2                  6
-#define SW2temp                   5
-#define SW2_pressed               4
-#define TST                       3
-#define prev_TST                  2
-#define TSTtemp                   1
-#define TST_pressed               0
-
-byte Buttons2;
-#define RST                       7
-#define prev_RST                  6
-#define RSTtemp                   5
-#define RST_pressed               4
-
-
-byte calibON, menu_state;
-byte monitor_index = 0, BPM = 14, prev_BPM, failure, wanted_cycle_time;
+byte monitor_index = 0, BPM = 14, prev_BPM, in_wait, failure, send_beep,
+     wanted_cycle_time, disconnected = 0, high_pressure_detected = 0,
+     motion_failure = 0, sent_LCD, hold_breath, safety_pressure_detected;
 
 // For the detection of push buttons
-byte counter_SW2_ON, counter_SW2_OFF, counter_TST_ON, counter_TST_OFF,
-     counter_RST_ON, counter_RST_OFF;
+byte SW2, prev_SW2, SW2temp, SW2_pressed, counter_SW2_ON, counter_SW2_OFF,
+     TST, prev_TST, TSTtemp, TST_pressed, counter_TST_ON, counter_TST_OFF,
+     RST, prev_RST, RSTtemp, RST_pressed, counter_RST_ON, counter_RST_OFF;
 
 byte insp_pressure, prev_insp_pressure, safety_pressure_counter, no_fail_counter,
-     motion_time,
-     telemetry_option = 0, adjusting_params = 0;
+     patient_triggered_breath, motion_time, progress,
+     telemetry_option = 0, adjusting_params = 0, save_cancelled = 0;
 
 int A_pot, prev_A_pot, A_current, Compression_perc = 80, prev_Compression_perc,
     A_rate, A_comp, A_pres;
@@ -274,10 +274,16 @@ float wanted_pos, wanted_vel_PWM, range, range_factor, profile_planned_vel,
 float FF = FF_DEF, KP = KP_DEF, KI = KI_DEF, FF_temp, KP_temp, KI_temp;
 
 // For the adjustment vector (wanted_pos)
+// TODO: Mejor cambiar a tipo byte, con valores entre 0 y 255, y donde se use,
+// dividir entre 100
+// float adj_v[N_adj] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                      // 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 byte adj_v[N_adj] = {100, 100, 100, 100, 100, 100, 100, 100,
                      100, 100, 100, 100, 100, 100, 100};
-byte adj_v_temp[N_adj], adj_ind;
+//float adj_v_temp[N_adj];
+byte adj_v_temp[N_adj];
 float adj_val;
+byte adj_ind;
 byte Compression_perc_v[N_adj] = {30, 35, 40, 45, 50, 55, 60, 65,
                                   70, 75, 80, 85, 90, 95, 100};
 
@@ -291,6 +297,10 @@ void setup()
   pinMode(pin_INA, OUTPUT);  // For driver VNH5019A-E
   pinMode(pin_INB, OUTPUT);  // For driver VNH5019A-E
 
+//  pinMode(pin_FD, INPUT_PULLUP);
+//  pinMode(pin_FU, INPUT_PULLUP);
+//  pinMode(pin_AD, INPUT_PULLUP);
+//  pinMode(pin_AU, INPUT_PULLUP);
   pinMode(pin_TST, INPUT_PULLUP);
   pinMode(pin_SW2, INPUT_PULLUP);
   pinMode(pin_RST, INPUT_PULLUP);
@@ -325,9 +335,8 @@ void setup()
 #if LCD_available == 1
   lcd.begin();      // initialize the LCD
   lcd.backlight();  // Turn on the backlight and print a message.
-  lcd.setCursor(0, 0);  lcd.print("    AmboVent    ");
-  lcd.setCursor(0, 1);  lcd.print("   UVG+HUMANA   ");
-  delay(1000);
+  lcd.setCursor(0, 0);  lcd.print("AmboVent-UVG   ");
+  lcd.setCursor(0, 1);  lcd.print("1690.108       ");
 #endif
 
 #if central_monitor_system==1
@@ -351,9 +360,7 @@ void setup()
   EEPROM.get(32, pres_pot_high);  delay(20);
 
   if(min_arm_pos >= 0 && max_arm_pos < 1024 && min_arm_pos < max_arm_pos)
-    bitSet(Status, calibrated);
-  else
-    bitClear(Status, calibrated);
+    calibrated = 1;
 
   EEPROM.get(36, FF);                    delay(20);
   EEPROM.get(36 + sizeof(float), KP);    delay(20);
@@ -368,6 +375,15 @@ void setup()
   if(KI < KI_MIN || KI > KI_MAX || isnan(KI) == 1)
     KI = KI_DEF;
 
+  // for(i = 0; i < N_adj; i++)
+  // {
+    // EEPROM.get(36 + (3+i)*sizeof(float), adj_v[i]);
+    // delay(20);
+
+    // if(adj_v[i] <= 0.0 || adj_v[i] > 3.0 || isnan(adj_v[i]))
+      // adj_v[i] = 1.0;
+  // }
+
   for(i = 0; i < N_adj; i++)
   {
     EEPROM.get(36 + 3*sizeof(float) + i*sizeof(byte), adj_v[i]);
@@ -377,18 +393,11 @@ void setup()
       adj_v[i] = 100;
   }
 
+
 // ----------------------------------------------------------------------------
 
-// Set initial values
-  bitClear(Alarms, disconnected);
-  bitClear(Alarms, motion_failure);
-  bitClear(Alarms, high_pressure_detected);
-  bitClear(Status, manual_mov_enabled);  // Will be updated at the first read_IO
-  bitClear(Status, CONFIG_enabled);      // Will be updated at the first read_IO
-  bitClear(Status, save_cancelled);
-
   insp_pressure = insp_pressure_default;
-  bitWrite(Alarms, patient_triggered_breath, patient_triggered_breath_def);
+  patient_triggered_breath = patient_triggered_breath_def;
   motion_time = motion_time_default;
 
 #if LCD_available == 1
@@ -409,29 +418,29 @@ void loop()
     case STBY_STATE:     // standby
       standby_func();
 
-      if(bitRead(Buttons1, SW2_pressed) && bitRead(Status, calibrated) == 1)  // start breathing motion
+      if(SW2_pressed && calibrated == 1)  // start breathing motion
       { 
         state = BREATH_STATE;
         initialize_breath();
       }
 
-      if(bitRead(Buttons1, TST) == 0)
+      if(TST == 0)
         last_TST_not_pressed = millis();
 
       if(millis() - last_TST_not_pressed > 3000)
       { 
         LED_USR(1);
 
-        while(bitRead(Buttons1, TST) == 1 || bitRead(Buttons1, TST_pressed))
+        while(TST == 1 || TST_pressed)
         {
           read_IO(); 
         }   // wait for button release
 
-        bitClear(Status, progress);
+        progress = 0;
         state = MENU_STATE;
       }
 
-      if(bitRead(Alarms, motion_failure) == 1 && bitRead(Buttons2, RST_pressed) == 1)
+      if(motion_failure == 1 && RST_pressed == 1)
       {
         reset_failures();
 #if LCD_available == 1
@@ -444,10 +453,10 @@ void loop()
     case BREATH_STATE:     // run profile
       run_profile_func();
 
-      if(bitRead(Buttons1, SW2_pressed))
+      if(SW2_pressed)
         state = STBY_STATE;  // stop breathing motion
 
-      if(bitRead(Alarms, motion_failure) == 1 && bitRead(Buttons2, RST_pressed) == 1)
+      if(motion_failure == 1 && RST_pressed == 1)
       {
         reset_failures();
 #if LCD_available == 1
@@ -487,7 +496,7 @@ void display_menu()
     case 1:     // calib pot
       display_text_2_lines("Calibrate Pots", "TEST to start");
 
-      if(bitRead(Buttons1, TST_pressed))
+      if(TST_pressed)
       {
         calibrate_pot_range();
         exit_menu();
@@ -498,7 +507,7 @@ void display_menu()
     case 2:     // calib pressure sensor
       display_text_2_lines("Calib pressure", "TEST to start");
 
-      if(bitRead(Buttons1, TST_pressed))
+      if(TST_pressed)
       {
 #if pressure_sensor_available == 1
         //pressure_baseline = int(sparkfumPress.getPressure(ADC_4096));
@@ -510,18 +519,18 @@ void display_menu()
       break;
 
     case 3:     // move arm down once
-      if(bitRead(Status, progress) == 0)
+      if(progress == 0)
       {
         display_text_2_lines("Press TEST to", "run one breath  ");
 
-        if(bitRead(Buttons1, TST_pressed)) 
+        if(TST_pressed) 
         {
           initialize_breath();
-          bitSet(Status, progress);
+          progress = 1;
         }
       }
 
-      if(bitRead(Status, progress) == 1)
+      if(progress == 1)
       {
         run_profile_func();
 
@@ -534,7 +543,7 @@ void display_menu()
     case 4:     // calib arm range of movement
       display_text_2_lines("Calibrate Arm", "TEST to start");
 
-      if(bitRead(Buttons1, TST_pressed))
+      if(TST_pressed)
       {
         calibrate_arm_range();  // AGREGAR MOVIMIENTO MANUAL
         exit_menu();
@@ -545,11 +554,11 @@ void display_menu()
     case 5:     // set motion profile total time
       display_text_2_lines("Set Motion Time", "TEST to start ");
 
-      if(bitRead(Buttons1, TST_pressed))
+      if(TST_pressed)
       {
         read_IO();
 
-        while(bitRead(Buttons1, TST_pressed) == 0)
+        while(TST_pressed == 0)
         {
           read_IO();
 
@@ -578,23 +587,21 @@ void display_menu()
       break;
 
     case 6:     // toggle sync to patient
-      if(bitRead(Alarms, patient_triggered_breath) == 1)
+      if(patient_triggered_breath == 1)
         display_text_2_lines("Sync to patient", "ON  ");
 
-      if(bitRead(Alarms, patient_triggered_breath) == 0)
+      if(patient_triggered_breath == 0)
         display_text_2_lines("Sync to patient","OFF  ");
 
-      if(bitRead(Buttons1, TST_pressed))
+      if(TST_pressed)
       {
-        //patient_triggered_breath = 1 - patient_triggered_breath;
-        bitWrite(Alarms, patient_triggered_breath,
-                                1 - bitRead(Alarms, patient_triggered_breath));
+        patient_triggered_breath = 1 - patient_triggered_breath;
         delay(110); //  wait enough time that the display will be updated ..
 
-        if(bitRead(Alarms, patient_triggered_breath) == 1)
+        if(patient_triggered_breath == 1)
          display_text_2_lines("Sync to patient", "ON  ");
 
-        if(bitRead(Alarms, patient_triggered_breath) == 0)
+        if(patient_triggered_breath == 0)
           display_text_2_lines("Sync to patient", "OFF  ");
 
         delay(1000);
@@ -604,11 +611,11 @@ void display_menu()
       break;
 
     case 7:    // Manual movement of the arm, if enabled
-      if(bitRead(Status, manual_mov_enabled))
+      if(manual_mov_enabled)
       {
         display_text_2_lines("Manual Movement", "TEST to start");
         
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
           telemetry_option = 1;
           move_arm_with_pot();
@@ -621,7 +628,7 @@ void display_menu()
       {
         display_text_2_lines("Man Mov Disbld.", "Press TEST");
 
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
           delay(100);
           exit_menu();
@@ -631,11 +638,11 @@ void display_menu()
       break;
 
     case 8:    // PID calibration, if enabled
-      if(bitRead(Status, CONFIG_enabled))
+      if(CONFIG_enabled)
       {
         display_text_2_lines("PID Calib ", "TEST to start");
 
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
           telemetry_option = 2;
 // Primero colocar los pots en la posición correspondiente a las
@@ -644,7 +651,7 @@ void display_menu()
 
           telemetry_option = 0;
           adjusting_params = 1;
-          bitClear(Status, save_cancelled);
+          save_cancelled = 0;
 
           read_IO();
 
@@ -653,15 +660,15 @@ void display_menu()
           KP_temp = KP;
           KI_temp = KI;
 
-          while(bitRead(Buttons1, TST_pressed) == 0)
+          while(TST_pressed == 0)
           {
             set_PID_constants();
             run_profile_func();
             read_IO();
 
-            if(bitRead(Buttons2, RST_pressed) == 1)
+            if(RST_pressed == 1)
             {
-              bitSet(Status, save_cancelled);
+              save_cancelled = 1;
               break;
             }
           }
@@ -671,7 +678,7 @@ void display_menu()
           wanted_vel_PWM = 0;  // dont move
           set_motor_PWM(wanted_vel_PWM);
 
-          if(bitRead(Status, save_cancelled) == 0)
+          if(save_cancelled == 0)
           {
             // Save control constants to the EEPROM
             EEPROM.put(36, FF);                    delay(200);
@@ -699,7 +706,7 @@ void display_menu()
       {
         display_text_2_lines("PID Cal Disbld.", "Press TEST");
 
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
           delay(100);
           exit_menu();
@@ -710,15 +717,15 @@ void display_menu()
 
 
     case 9:    // Volume adjustment vector calibration, if enabled
-      if(bitRead(Status, CONFIG_enabled))
+      if(CONFIG_enabled)
       {
         display_text_2_lines("Adj_v Calib", "TEST to start");
 
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
           telemetry_option = 3;
           adjusting_params = 2;
-          bitClear(Status, save_cancelled);
+          save_cancelled = 0;
           delay(100);  // give some time for TST_pressed to change back to 0
 
           read_IO();
@@ -734,7 +741,7 @@ void display_menu()
       {
         display_text_2_lines("Adj_v Cal Disbld", "Press TEST");
 
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
           delay(100);
           exit_menu();
@@ -745,16 +752,21 @@ void display_menu()
 
 
     case 10:    // FACTORY RESET
-      if(bitRead(Status, CONFIG_enabled))
+      if(CONFIG_enabled)
       {
         display_text_2_lines("FACTORY RESET", "TEST to reset");
 
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
-          factory_reset();  
+// COMO YA ESTOY LLEGANDO AL LÍMITE DE MEMORIA DE PROGRAMA Y MEMORIA DINÁMICA, EL ARDUINO SE RESETEA.
+// TENGO QUE TRATAR DE QUE EL PROGRAM MEMORY NO PASE DE 85%, Y LAS VARIABLES GLOBALES NO USEN MÁS
+// DEL 90% DE LA MEMORIA DINÁMICA.
+// EN LAS ÚLTIMAS PRUEBAS, SI INCLUYO LA FUNCIÓN SIGUIENTE, EL PROGRAMA SE RESETEA. SI NO LA INCLUYO,
+// FUNCIONA BIEN...
+//          factory_reset();  
           exit_menu();
         }
-        else if(bitRead(Buttons2, RST_pressed))
+        else if(RST_pressed)
         {
           delay(100);
           display_text_2_lines("FACTORY RESET", "Cancelled");
@@ -766,7 +778,7 @@ void display_menu()
       {
         display_text_2_lines("RESET Disbld", "Press TEST");
 
-        if(bitRead(Buttons1, TST_pressed))
+        if(TST_pressed)
         {
           delay(100);
           exit_menu();
@@ -779,7 +791,7 @@ void display_menu()
     default:
       display_text_2_lines("Exit Menu", "Press TEST");
 
-      if(bitRead(Buttons1, TST_pressed))
+      if(TST_pressed)
         exit_menu();
 
       break;
@@ -799,7 +811,7 @@ void exit_menu()
   display_LCD();
 #endif
 
-  bitClear(Status, progress);
+  progress = 0;
 }
 
 
@@ -818,27 +830,27 @@ void run_profile_func()
     
     if(100*abs(error)/(max_arm_pos - min_arm_pos) >
                               motion_control_allowed_error && cycle_number > 1)
-      bitSet(Alarms, motion_failure);
+      motion_failure = 1;
 
-    if(bitRead(Alarms, safety_pressure_detected))
+    if(safety_pressure_detected)
       index -= speed_multiplier_reverse*(1+cycles_lost);  // run in reverse if high pressure was detected
 
     if(index < 0)
     {
-      if(bitRead(Alarms, safety_pressure_detected) == 1)
+      if(safety_pressure_detected == 1)
         safety_pressure_counter += 1;  // count the number of cases reaching safety pressure
 
-      bitClear(Alarms, safety_pressure_detected);
+      safety_pressure_detected = 0;
       wait_cycles = 100*wait_time_after_resistance;
       index = profile_length - 2;  // set index to the point of waiting 
     }  // stop the reverse when reching the cycle start point
 
-    if(bitRead(Alarms, in_wait) == 0)
+    if(in_wait == 0)
       index += (1 + cycles_lost);  // advance index while not waiting at the end of cycle
 
-    if(bitRead(Alarms, patient_triggered_breath) == 1)  // detect drop in presure during the PEEP plateu and trigger breath based on this
+    if(patient_triggered_breath == 1)  // detect drop in presure during the PEEP plateu and trigger breath based on this
     {
-      if(bitRead(Alarms, in_wait) == 1 || (index > profile_length/2 && (A_pot < min_arm_pos + range/18)))
+      if(in_wait == 1 || (index > profile_length/2 && (A_pot < min_arm_pos + range/18)))
       {
         if(avg_pres - pressure_abs > delta_pres_patient_inhale)
           start_new_cycle();  // start new breath cycle if patient tries to inhale durint the PEEP plateu
@@ -853,9 +865,9 @@ void run_profile_func()
 
     if(index >= (profile_length - 2))  // wait for the next cycle to begin in this point -> 2 points befoe the last cycle index
     {
-      if(bitRead(Status, sent_LCD) == 0)
+      if(sent_LCD == 0)
       {
-        bitSet(Status, sent_LCD);
+        sent_LCD = 1;
 #if LCD_available == 1
         display_LCD();    // update the display at the end of cycle
 #endif
@@ -865,7 +877,7 @@ void run_profile_func()
       if(millis() - start_wait < breath_cycle_time)
       {
         index = profile_length - 2;
-        bitSet(Alarms, in_wait);  // still need to wait ...
+        in_wait = 1;  // still need to wait ...
       }
       else
         start_new_cycle();  // time has come ... start from index = 0 
@@ -903,6 +915,10 @@ void calculate_wanted_pos_vel()
     adj_val = adj_v[adj_ind]/100.0;
   else if(Compression_perc > Compression_perc_v[adj_ind])
   {
+    // adj_val = (1.0*Compression_perc - 1.0*Compression_perc_v[adj_ind])*
+              // (adj_v[adj_ind+1] - adj_v[adj_ind])/
+              // (1.0*Compression_perc_v[adj_ind+1] - 1.0*Compression_perc_v[adj_ind]) +
+              // adj_v[adj_ind];
     adj_val = (1.0*(Compression_perc - Compression_perc_v[adj_ind])*
               (adj_v[adj_ind+1] - adj_v[adj_ind])/
               (Compression_perc_v[adj_ind+1] - Compression_perc_v[adj_ind]) +
@@ -910,6 +926,10 @@ void calculate_wanted_pos_vel()
   }
   else
   {
+    // adj_val = (1.0*Compression_perc - 1.0*Compression_perc_v[adj_ind-1])*
+              // (adj_v[adj_ind] - adj_v[adj_ind-1])/
+              // (1.0*Compression_perc_v[adj_ind] - 1.0*Compression_perc_v[adj_ind-1]) +
+              // adj_v[adj_ind-1];
     adj_val = (1.0*(Compression_perc - Compression_perc_v[adj_ind-1])*
               (adj_v[adj_ind] - adj_v[adj_ind-1])/
               (Compression_perc_v[adj_ind] - Compression_perc_v[adj_ind-1]) +
@@ -924,17 +944,17 @@ void calculate_wanted_pos_vel()
 
   planned_vel = profile_planned_vel;
 
-  if(bitRead(Alarms, hold_breath) == 1 && bitRead(Alarms, safety_pressure_detected) == 0)
+  if(hold_breath == 1 && safety_pressure_detected == 0)
   {
     if(wanted_pos <= float(A_pot) || index == 0)
-      bitClear(Alarms, hold_breath);
+      hold_breath = 0;
 
     planned_vel = 0;
     integral = 0;
     wanted_pos = float(A_pot);  // hold current position
   }
 
-  if(bitRead(Alarms, safety_pressure_detected))  // to do the revese in case high pressure detected
+  if(safety_pressure_detected)  // to do the revese in case high pressure detected
     planned_vel = -speed_multiplier_reverse*planned_vel;
 
   prev_error = error;
@@ -969,11 +989,11 @@ void calculate_wanted_pos_vel()
 
 void standby_func()  // not running profile
 {
-  if(bitRead(Status, USR_status))
+  if(USR_status)
   {
     if(millis() - lastUSRblink > 10)
     {
-      bitClear(Status, USR_status);
+      USR_status = 0;
       lastUSRblink = millis();
       LED_USR(0);
     }
@@ -982,28 +1002,28 @@ void standby_func()  // not running profile
   {
     if(millis() - lastUSRblink > 490)
     {
-      bitSet(Status, USR_status);
+      USR_status = 1;
       lastUSRblink = millis();
       LED_USR(1);
     }
   }
   
-  if(bitRead(Buttons1, TST_pressed))
+  if(TST_pressed)
   {
     initialize_breath();
-    bitSet(Status, progress);
+    progress = 1;
   }
 
-  if(bitRead(Status, progress) == 1)
+  if(progress == 1)
   {
     run_profile_func();
 
     if(cycle_number > 0)
-      bitClear(Status, progress);
+      progress = 0;
   }
   else
   {
-    wanted_vel_PWM = 0;  // don't move
+    wanted_vel_PWM = 0;  // dont move
     set_motor_PWM(wanted_vel_PWM);
   }
 
@@ -1017,8 +1037,8 @@ void initialize_breath()
   integral = 0;
   reset_failures();
   index = 0;
-  bitClear(Alarms, in_wait);
-  bitClear(Alarms, high_pressure_detected);
+  in_wait = 0;
+  high_pressure_detected = 0;
 }
 
 void start_new_cycle()
@@ -1026,10 +1046,10 @@ void start_new_cycle()
   index = 0;
   cycle_number += 1;
   start_wait = millis();
-  bitClear(Alarms, in_wait);
-  bitSet(Status, send_beep);
-  bitClear(Status, sent_LCD);
-  bitClear(Alarms, high_pressure_detected);
+  in_wait = 0;
+  send_beep = 1;
+  sent_LCD = 0;
+  high_pressure_detected = 0;
 }
 
 // Maps back to 0 - 1023 interval
@@ -1066,13 +1086,13 @@ void find_min_max_pressure()
 
 void blink_user_led()
 {
-  if(bitRead(Alarms, high_pressure_detected) || bitRead(Alarms, safety_pressure_detected))  // blink LED fast
+  if(high_pressure_detected || safety_pressure_detected)  // blink LED fast
   {
-    if(bitRead(Status, USR_status))
+    if(USR_status)
     {
       if(millis() - lastUSRblink > 20)
       {
-        bitClear(Status, USR_status);
+        USR_status = 0;
         lastUSRblink = millis();
         LED_USR(0);
       }
@@ -1081,7 +1101,7 @@ void blink_user_led()
     {
       if(millis() - lastUSRblink > 80)
       {
-        bitSet(Status, USR_status);
+        USR_status = 1;
         lastUSRblink = millis();
         LED_USR(1);
       }
@@ -1099,42 +1119,42 @@ void blink_user_led()
 void calc_failure()
 {
   if(prev_max_pressure < max_pres_disconnected && cycle_number > 2)
-    bitSet(Alarms, disconnected);
+    disconnected = 1;
   else
-    bitClear(Alarms, disconnected);  // tube was disconnected
+    disconnected = 0;  // tube was disconnected
 
-  if(pressure_abs > insp_pressure && bitRead(Alarms, hold_breath) == 0 && profile_planned_vel > 0)
+  if(pressure_abs > insp_pressure && hold_breath == 0 && profile_planned_vel > 0)
   {
-    bitSet(Alarms, high_pressure_detected);
-    bitSet(Alarms, hold_breath);
+    high_pressure_detected = 1;
+    hold_breath = 1;
     index_to_hold_breath = index;
   }  // high pressure detected
 
   if(pressure_abs > safety_pressure && profile_planned_vel > 0)
-    bitSet(Alarms, safety_pressure_detected);
+    safety_pressure_detected = 1;
 
   if(pressure_abs > insp_pressure + safety_pres_above_insp && profile_planned_vel > 0)
-    bitSet(Alarms, safety_pressure_detected);
+    safety_pressure_detected = 1;
 
-  if(index == 0 && prev_index !=0 && failure == 0 && bitRead(Alarms, safety_pressure_detected) == 0)
+  if(index == 0 && prev_index !=0 && failure == 0 && safety_pressure_detected == 0)
     no_fail_counter += 1;
 
   if(index == 0)
     failure = 0;
 
-  if(bitRead(Alarms, disconnected))
+  if(disconnected)
     failure = 1;
 
-  if(bitRead(Alarms, safety_pressure_detected) && safety_pressure_counter >= 1)
+  if(safety_pressure_detected && safety_pressure_counter >= 1)
   {
     failure = 2;
     safety_pressure_counter = 1;
   }
 
-  if(bitRead(Alarms, motion_failure))
-    failure = 3;
+  if(motion_failure)
+    failure = 3;  // 3
 
-  if(bitRead(Alarms, disconnected) == 1 || bitRead(Alarms, motion_failure) == 1 || bitRead(Alarms, safety_pressure_detected) == 1)
+  if(disconnected == 1 || motion_failure == 1 || safety_pressure_detected == 1)
   {
     no_fail_counter = 0;
   }
@@ -1199,28 +1219,28 @@ void calibrate_arm_range()   // used for calibaration of motion range
 {
   LED_USR(1);
   calibON = 1;
-  bitClear(Status, progress);
+  progress = 0;
 
   display_text_calib("Set Upper");
 
-  while(bitRead(Status, progress) == 0)
+  while(progress == 0)
     internal_arm_calib_step();  // step 1 - calibrate top position
 
-  bitClear(Status, progress);
+  progress = 0;
   min_arm_pos = A_pot;
 
   display_text_calib("Set Lower");
 
-  while(bitRead(Status, progress) == 0)
+  while(progress == 0)
     internal_arm_calib_step();  // step 2 - calibrate bottom position
 
-  bitClear(Status, progress);
+  progress = 0;
   max_arm_pos = A_pot + COMP_PUSHBACK;  // To compensate for Ambu pushing back.
   max_arm_pos = constrain(A_pot,0, 1023);
 
   display_text_calib("Move to Safe");
 
-  while(bitRead(Status, progress) == 0)
+  while(progress == 0)
     internal_arm_calib_step();  // step 3 - manual control for positioning back in safe location 
 
   EEPROM.put(4, min_arm_pos);
@@ -1228,17 +1248,17 @@ void calibrate_arm_range()   // used for calibaration of motion range
   EEPROM.put(8, max_arm_pos);
   delay(200);
 
-  bitSet(Status, calibrated);
+  calibrated = 1;
 }
 
 void internal_arm_calib_step()
 {
   read_IO();
 
-  if(bitRead(Buttons1, TST_pressed))
-    bitSet(Status, progress);
+  if(TST_pressed)
+    progress = 1;
 
-  if(bitRead(Buttons1, SW2temp))  // Move a little in the positive direction
+  if(SW2temp)  // Move a little in the positive direction
   {
     digitalWrite(pin_INA, HIGH);
     digitalWrite(pin_INB, LOW);
@@ -1249,7 +1269,7 @@ void internal_arm_calib_step()
     analogWrite(pin_PWM, 0);
   }
 
-  if(bitRead(Buttons2, RSTtemp))  // Move a little in the negative direction
+  if(RSTtemp)  // Move a little in the negative direction
   {
     digitalWrite(pin_INA, LOW);
     digitalWrite(pin_INB, HIGH);
@@ -1272,7 +1292,7 @@ void calibrate_pot_range()   // used for calibaration of potentiometers
   read_IO();
   display_text_calib("Pot to left pos");
 
-  while(bitRead(Buttons1, TST_pressed) == 0)
+  while(TST_pressed == 0)
     read_IO();    // step 1 - calibrate top position
 
   comp_pot_low = analogRead(pin_AMP);
@@ -1282,7 +1302,7 @@ void calibrate_pot_range()   // used for calibaration of potentiometers
   read_IO();
   display_text_calib ("Pot to right pos");
 
-  while(bitRead(Buttons1, TST_pressed) == 0)
+  while(TST_pressed == 0)
     read_IO();    // step 2 - calibrate bottom position
 
   comp_pot_high = analogRead(pin_AMP);
@@ -1312,7 +1332,7 @@ void move_arm_with_pot()
 #endif
   delay(100);
 
-  while(bitRead(Buttons1, TST_pressed) == 0)
+  while(TST_pressed == 0)
   {
     read_IO();    // Read status of User Interface
   
@@ -1328,6 +1348,9 @@ void move_arm_with_pot()
 
         if(telemetry == 1)
           print_tele();
+
+       // display_text_2_lines("Manual Movement", "TEST to stop");
+          
       }
     }
   }
@@ -1446,7 +1469,7 @@ void display_LCD()  // here function that sends data to LCD
 
 void reset_failures()
 {
-  bitClear(Alarms, motion_failure);
+  motion_failure = 0;
   index_last_motion = index;
   failure = 0;
 }
@@ -1468,7 +1491,7 @@ void set_motor_PWM(float wanted_vel_PWM)
       wanted_vel_PWM = 0;
   }
 
-  if(bitRead(Alarms, motion_failure) == 1 && calibON == 0)
+  if(motion_failure == 1 && calibON == 0)
     wanted_vel_PWM = 0;
 
   if(wanted_vel_PWM > 0)
@@ -1504,35 +1527,57 @@ void set_motor_PWM(float wanted_vel_PWM)
   analogWrite(pin_PWM, motorPWM);
 }
 
-// REVISAR SI REALMENTE USAMOS ESTA FUNCIÓN (ESTA OPCIÓN)
 int read_motion_for_calib()
 {
   int wanted_cal_PWM;
 
-  if(pot_rate > 750)
-    wanted_cal_PWM = (pot_rate - 750)/15;
+  if(control_with_pot)
+  {
+    if(pot_rate > 750)
+      wanted_cal_PWM = (pot_rate - 750)/15;
 
-  if(pot_rate < 250)
-    wanted_cal_PWM = (pot_rate - 250)/15;
+    if(pot_rate < 250)
+      wanted_cal_PWM = (pot_rate - 250)/15;
 
-  if(pot_rate >= 250 && pot_rate <= 750)
+    if(pot_rate >= 250 && pot_rate <= 750)
+      wanted_cal_PWM = 0;
+
+    if(SW2 == 1)
+      wanted_cal_PWM = -12;
+
+    // if (RST==1) wanted_cal_PWM= 12;
+
+//    Serial.println(wanted_cal_PWM);
+  }
+/*  else
+  {
     wanted_cal_PWM = 0;
 
-  if(bitRead(Buttons1, SW2) == 1)
-    wanted_cal_PWM = -12;
+    if(FD == 1)
+      wanted_cal_PWM = 8;
 
-//  if (bitRead(Buttons2, RST)==1) wanted_cal_PWM= 12;
-//    Serial.println(wanted_cal_PWM);
+    if(FU == 1)
+      wanted_cal_PWM = -8;
 
+    if(AD == 1)
+      wanted_cal_PWM = 16;
+
+    if(AU == 1)
+      wanted_cal_PWM = -16;
+  }
+*/
   return(wanted_cal_PWM);
 }
 
 void store_prev_values()
 {
-  bitWrite(Buttons1, prev_SW2, bitRead(Buttons1, SW2));
-  bitWrite(Buttons1, prev_TST, bitRead(Buttons1, TST));
-  bitWrite(Buttons2, prev_RST, bitRead(Buttons2, RST));
-
+//  prev_FD = FD;
+//  prev_FU = FU;
+//  prev_AD = AD;
+//  prev_AU = AU;
+  prev_SW2 = SW2;
+  prev_TST = TST;
+  prev_RST = RST;
   prev_BPM = BPM;
   prev_A_pot = A_pot;
   prev_Compression_perc = Compression_perc;
@@ -1698,16 +1743,16 @@ void adj_v_module()
 
     read_IO();
 
-    while(bitRead(Buttons1, TST_pressed) == 0)
+    while(TST_pressed == 0)
     {
       set_adj_v_values();
       run_profile_func();
 
       read_IO();
 
-      if(bitRead(Buttons2, RST_pressed) == 1)
+      if(RST_pressed == 1)
       {
-        bitSet(Status, save_cancelled);
+        save_cancelled = 1;
         break;
       }
 
@@ -1720,7 +1765,7 @@ void adj_v_module()
       }
     }
 
-    if(bitRead(Status, save_cancelled) == 1)
+    if(save_cancelled == 1)
       break;
 
     delay(100);  // give some time for TST_pressed to change back to 0
@@ -1731,7 +1776,7 @@ void adj_v_module()
   wanted_vel_PWM = 0;  // dont move
   set_motor_PWM(wanted_vel_PWM);
 
-  if(bitRead(Status, save_cancelled) == 0)
+  if(save_cancelled == 0)
   {
   // Save adjustment vector values to the EEPROM
     for(i = 0; i < N_adj; i++)
@@ -1759,6 +1804,10 @@ void adj_v_module()
 // Variables i and Compression_perc are being changed in 
 void set_adj_v_values()
 {
+  // adj_v[i] = (ADJ_V_MAX - ADJ_V_MIN)*1.0*(analogRead(pin_AMP) - 
+          // comp_pot_low)/(1.0*(comp_pot_high - comp_pot_low)) + ADJ_V_MIN;
+//  adj_v[i] = byte((ADJ_V_MAX - ADJ_V_MIN)*(analogRead(pin_AMP) - 
+//          comp_pot_low)/(comp_pot_high - comp_pot_low)) + ADJ_V_MIN;
   adj_v[i] = map(analogRead(pin_AMP), comp_pot_low, comp_pot_high, ADJ_V_MIN, ADJ_V_MAX);
           
   adj_v[i] = constrain(adj_v[i], ADJ_V_MIN, ADJ_V_MAX);
@@ -1772,6 +1821,8 @@ void set_adj_v_values()
     lcd.print("Comp per: ");
     lcd.print(Compression_perc);
     lcd.setCursor(0, 1);
+    // lcd.print("adj_v: ");
+    // lcd.print((float)(adj_v[i]));
     lcd.print("adj_v %: ");
     lcd.print(adj_v[i]);
 #endif
@@ -1796,12 +1847,12 @@ void factory_reset()
   {
     read_IO();
 
-    if(bitRead(Buttons1, TST_pressed))
+    if(TST_pressed)
     {
       res_confirm = 1;
       break;
     }
-    else if(bitRead(Buttons2, RST_pressed))
+    else if(RST_pressed)
     {
       res_confirm = 0;
       break;
@@ -1845,12 +1896,19 @@ void factory_reset()
     EEPROM.put(36 + sizeof(float), KP);    delay(200);
     EEPROM.put(36 + 2*sizeof(float), KI);  delay(200);
 
+    //for(i = 0; i < N_adj; i++)
+    //{
+      //adj_v[i] = 1.0;
+      //EEPROM.put(36 + (3+i)*sizeof(float), adj_v[i]);
+      //delay(200);
+    //}
     for(i = 0; i < N_adj; i++)
     {
       adj_v[i] = 100;
       EEPROM.put(36 + 3*sizeof(float) + i*sizeof(byte), adj_v[i]);
       delay(200);
     }
+
   }
   else
   {
@@ -1869,112 +1927,110 @@ void read_IO()
 {
   store_prev_values();
 
-// Check Configuration switch to see if manual movement and Config (calibration)
-// is enabled.
-//  bitWrite(Status, manual_mov_enabled, digitalRead(pin_CONFIG));
-  bitSet(Status, manual_mov_enabled);  // TEMPORAL
-//  bitWrite(Status, CONFIG_enabled, digitalRead(pin_CONFIG));
-  bitSet(Status, CONFIG_enabled);    // TEMPORAL
+//  manual_mov_enabled = digitalRead(pin_CONFIG);
+//  CONFIG_enabled = digitalRead(pin_CONFIG);
+  manual_mov_enabled = 1;
+  CONFIG_enabled = 1;  // for both PID and adj_v calibration
 
-  bitWrite(Buttons1, SW2temp, 1 - digitalRead(pin_SW2));
-  bitWrite(Buttons1, TSTtemp, 1 - digitalRead(pin_TST));
-  bitWrite(Buttons2, RSTtemp, 1 - digitalRead(pin_RST));
+  TSTtemp = (1 - digitalRead(pin_TST));
+  SW2temp = (1 - digitalRead(pin_SW2));
+  RSTtemp = (1 - digitalRead(pin_RST));
 
 // First push button
-  if(bitRead(Buttons1, TSTtemp) == 1)
+  if(TSTtemp == 1)
   {
     counter_TST_ON += 1;
 
     if(counter_TST_ON > 20)
     {
-      bitSet(Buttons1, TST);
+      TST = 1;
       counter_TST_ON = 100;
     }
   }
   else
     counter_TST_ON = 0;
 
-  if(bitRead(Buttons1, TSTtemp) == 0)
+  if(TSTtemp == 0)
   {
     counter_TST_OFF += 1;
 
     if(counter_TST_OFF > 20)
     {
-      bitClear(Buttons1, TST);
+      TST = 0;
       counter_TST_OFF = 100;
     }
   }
   else
     counter_TST_OFF = 0;
 
-  if(bitRead(Buttons1, TST) == 0 && bitRead(Buttons1, prev_TST) == 1)
-    bitSet(Buttons1, TST_pressed);
+  if(TST == 0 && prev_TST == 1)
+    TST_pressed = 1;
   else
-    bitClear(Buttons1, TST_pressed);
+    TST_pressed = 0;
 
 // Second push button
-  if(bitRead(Buttons1, SW2temp) == 1)
+  if(SW2temp == 1)
   {
     counter_SW2_ON += 1;
 
     if(counter_SW2_ON > 20)
     {
-      bitSet(Buttons1, SW2);
+      SW2 = 1;
       counter_SW2_ON = 100;
     }
   }
   else
     counter_SW2_ON = 0;
 
-  if(bitRead(Buttons1, SW2temp) == 0)
+  if(SW2temp == 0)
   {
     counter_SW2_OFF += 1;
 
     if(counter_SW2_OFF > 20)
     {
-      bitClear(Buttons1, SW2);
+      SW2 = 0;
       counter_SW2_OFF = 100;
     }
   }
   else
     counter_SW2_OFF = 0;
 
-  if(bitRead(Buttons1, SW2) == 0 && bitRead(Buttons1, prev_SW2) == 1)
-    bitSet(Buttons1, SW2_pressed);
+  if(SW2 == 0 && prev_SW2 == 1)
+    SW2_pressed = 1;
   else
-    bitClear(Buttons1, SW2_pressed);
+    SW2_pressed = 0;
 
 // Third push button
-  if(bitRead(Buttons2, RSTtemp) == 1)
+  if(RSTtemp == 1)
   {
     counter_RST_ON += 1;
 
     if(counter_RST_ON > 20)
     {
-      bitSet(Buttons2, RST);
+      RST = 1;
       counter_RST_ON = 100;
     }
   }
   else
     counter_RST_ON = 0;
 
-  if(bitRead(Buttons2, RSTtemp) == 0)
+  if(RSTtemp == 0)
   {
     counter_RST_OFF += 1;
 
     if(counter_RST_OFF > 20)
     {
-      bitClear(Buttons2, RST);
+      RST = 0;
       counter_RST_OFF = 100;
     }
   }
   else
     counter_RST_OFF = 0;
 
-  if(bitRead(Buttons2, RST) == 0 && bitRead(Buttons2, prev_RST) == 1)
-    bitSet(Buttons2, RST_pressed);
+  if(RST == 0 && prev_RST == 1)
+    RST_pressed = 1;
   else
-    bitClear(Buttons2, RST_pressed);
+    RST_pressed = 0;
 
 
   if(invert_pot)
@@ -1984,61 +2040,148 @@ void read_IO()
 
 //  A_current = analogRead(pin_CUR)/8;  // in tenth Amps
 
-  // When adjusting PID values, or adj_v values, don't use pot values
-  // to adjust BPM, Compression_perc and insp_pressure.
-  if(adjusting_params != 1)  // NO PID adjustment being done
+  if(control_with_pot)
   {
-    A_rate = analogRead(pin_FRQ);
-    A_comp = analogRead(pin_AMP);
-    A_pres = analogRead(pin_PRE);
+    // When adjusting PID values, or adj_v values, don't use pot values
+    // to adjust BPM, Compression_perc and insp_pressure.
+    if(adjusting_params != 1)  // NO PID adjustment being done
+    {
+      A_rate = analogRead(pin_FRQ);
+      A_comp = analogRead(pin_AMP);
+      A_pres = analogRead(pin_PRE);
 
-    if(abs(pot_rate - A_rate) < 5)
-      pot_rate = pot_alpha*pot_rate + (1 - pot_alpha)*A_rate;
-    else
-      pot_rate = A_rate;
+      if(abs(pot_rate - A_rate) < 5)
+        pot_rate = pot_alpha*pot_rate + (1 - pot_alpha)*A_rate;
+      else
+        pot_rate = A_rate;
 
-    if(abs(pot_comp - A_comp) < 5)
-      pot_comp = pot_alpha*pot_comp + (1 - pot_alpha)*A_comp;
-    else
-      pot_comp = A_comp;
+      if(abs(pot_comp - A_comp) < 5)
+        pot_comp = pot_alpha*pot_comp + (1 - pot_alpha)*A_comp;
+      else
+        pot_comp = A_comp;
 
-    if(abs(pot_pres - A_pres) < 5)
-      pot_pres = pot_alpha*pot_pres + (1 - pot_alpha)*A_pres;
-    else
-      pot_pres = A_pres;
+      if(abs(pot_pres - A_pres) < 5)
+        pot_pres = pot_alpha*pot_pres + (1 - pot_alpha)*A_pres;
+      else
+        pot_pres = A_pres;
 
-    A_rate = range_pot(int(pot_rate), rate_pot_low, rate_pot_high);
-    A_comp = range_pot(int(pot_comp), comp_pot_low, comp_pot_high);
-    A_pres = range_pot(int(pot_pres), pres_pot_low, pres_pot_high);
-  }
-  else  // Adjusting PID parameters
-  {
-    A_rate = 800;  // BPM approx. 20
-    A_comp = 615;  // Compression_perc approx. 90
-    A_pres = 500;  // insp_pressure = 50
-  }
+      A_rate = range_pot(int(pot_rate), rate_pot_low, rate_pot_high);
+      A_comp = range_pot(int(pot_comp), comp_pot_low, comp_pot_high);
+      A_pres = range_pot(int(pot_pres), pres_pot_low, pres_pot_high);
+    }
+    else  // Adjusting PID parameters
+    {
+      A_rate = 800;  // BPM approx. 20
+      A_comp = 615;  // Compression_perc approx. 90
+      A_pres = 500;  // insp_pressure = 50
+    }
 
-  if(adjusting_params != 2)  // Adj_v NOT being calibrated
-  {
-    Compression_perc = perc_of_lower_vol_display + int(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
-    Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
-  }
+    if(adjusting_params != 2)  // Adj_v NOT being calibrated
+    {
+      Compression_perc = perc_of_lower_vol_display + int(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
+      Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
+    }
 
-  BPM = 6 + (A_rate - 23)/55;       // 0 is 6 breaths per minute, 1023 is 24 BPM
-  breath_cycle_time = 60000/BPM + 100;  // in milisec
+    BPM = 6 + (A_rate - 23)/55;       // 0 is 6 breaths per minute, 1023 is 24 BPM
+    breath_cycle_time = 60000/BPM + 100;  // in milisec
 
-  insp_pressure = 30 + A_pres/25;          // 0 is 30 mBar, 1023 is 70 mBar
-  insp_pressure = constrain(insp_pressure, 30, 70);
+    insp_pressure = 30 + A_pres/25;          // 0 is 30 mBar, 1023 is 70 mBar
+    insp_pressure = constrain(insp_pressure, 30, 70);
 
-  if(abs(insp_pressure - prev_insp_pressure) > 1)
-  {
-    prev_insp_pressure = insp_pressure;
-    start_disp_pres = millis();
+    if(abs(insp_pressure - prev_insp_pressure) > 1)
+    {
+      prev_insp_pressure = insp_pressure;
+      start_disp_pres = millis();
 
 #if LCD_available == 1
-    display_LCD();
+      display_LCD();
 #endif
+    }
   }
+/*  else
+  {
+    FD = (1 - digitalRead(pin_FD));
+    FU = (1 - digitalRead(pin_FU));
+    AD = (1 - digitalRead(pin_AD));
+    AU = (1 - digitalRead(pin_AU));
+
+    if(TST == 0)
+    {
+      if(FD == 0 && prev_FD == 1)
+      {
+        BPM -= 2;
+
+        if(BPM < 6)
+          BPM = 6;
+
+        cycle_number = 0;
+      }
+
+      if(FU == 0 && prev_FU == 1)
+      {
+        BPM += 2;
+
+        if(BPM > 24)
+          BPM = 24;
+
+        cycle_number = 0;
+      }
+
+      breath_cycle_time = 60000/BPM + 100;
+
+      if(AD == 0 && prev_AD == 1)
+      {
+        Compression_perc -= deltaUD;
+
+       if(Compression_perc < perc_of_lower_vol_display)
+         Compression_perc = perc_of_lower_vol_display;
+      }
+
+      if(AU == 0 && prev_AU == 1)
+      {
+        Compression_perc += deltaUD;
+
+        if(Compression_perc > 100)
+          Compression_perc = 100;
+      }
+    }
+
+    if(TST == 1)
+    {
+      if(FD == 0 && prev_FD == 1)
+      {
+        insp_pressure -=5;
+
+        if(insp_pressure < 30)
+          insp_pressure = 30;
+      }
+
+      if(FU == 0 && prev_FU == 1)
+      {
+        insp_pressure +=5;
+
+        if(insp_pressure > 70)
+          insp_pressure = 70;
+      }
+
+      if(AD == 0 && prev_AD == 1)
+      {
+        insp_pressure -=5;
+
+        if(insp_pressure < 30)
+          insp_pressure = 30;
+      }
+
+      if(AU == 0 && prev_AU == 1)
+      {
+        insp_pressure +=5;
+
+        if(insp_pressure > 70)
+          insp_pressure = 70;
+      }
+    }
+  }
+*/
 
   range_factor = perc_of_lower_volume +
                 (Compression_perc - perc_of_lower_vol_display)*(100 - perc_of_lower_volume)/(100 - perc_of_lower_vol_display);
@@ -2102,10 +2245,10 @@ void send_data_to_monitor()
 
   if(monitor_index == 5)
   {
-    if(bitRead(Status, send_beep))
+    if(send_beep)
     {
       Serial.println(byte(1));
-      bitClear(Status, send_beep);
+      send_beep = 0;
     }
     else
       Serial.println(byte(0));
@@ -2116,6 +2259,24 @@ void send_data_to_monitor()
 
   monitor_index = (monitor_index + 1) % 7;
 }
+
+/*
+void LED_FREQ(byte val)
+{
+  if(INVERT_LEDS)
+    digitalWrite(pin_LED_FREQ, 1 - val);
+  else
+    digitalWrite(pin_LED_FREQ, val);
+}
+
+void LED_AMP(byte val)
+{
+  if(INVERT_LEDS)
+    digitalWrite(pin_LED_AMP, 1 - val);
+  else
+    digitalWrite(pin_LED_AMP, val);
+}
+*/
 
 void LED_FAIL(byte val)
 {
@@ -2147,11 +2308,11 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
   {
     Serial.print("State: "); Serial.print(state);
     Serial.print(", Fail (disc, motion, hiPres): ");
-    Serial.print(bitRead(Alarms, disconnected));
+    Serial.print(disconnected);
     Serial.print(", ");
-    Serial.print(bitRead(Alarms, motion_failure));
+    Serial.print(motion_failure);
     Serial.print(", ");
-    Serial.print(bitRead(Alarms, high_pressure_detected));
+    Serial.print(high_pressure_detected);
 
     // Serial.print(" CL:");
     // Serial.print(cycles_lost);
@@ -2186,7 +2347,7 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.print("planned_vel: ");       Serial.print(planned_vel);
     Serial.print(", wanted_vel_PWM: ");  Serial.print(wanted_vel_PWM);
     Serial.print(", motorPWM: ");        Serial.print(motorPWM);
-    Serial.print(", Calibrated: ");      Serial.print(bitRead(Status, calibrated));
+    Serial.print(", Calibrated: ");      Serial.print(calibrated);
     Serial.println("");
 
     Serial.print("FF: ");                Serial.print(FF);
@@ -2198,6 +2359,13 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.print(", adj_ind: ");         Serial.print(adj_ind);
     Serial.print(", adj_val: ");         Serial.print(adj_val);
     Serial.println("");
+
+//    Serial.print("TSTtemp: ");           Serial.print(TSTtemp);
+//    Serial.print(", TST_pressed: ");     Serial.print(TST_pressed);
+//    Serial.print(", SW2temp: ");         Serial.print(SW2temp);
+//    Serial.print(", SW2_pressed: ");     Serial.print(SW2_pressed);
+//    Serial.print(", RSTtemp: ");         Serial.print(RSTtemp);
+//    Serial.print(", RST_pressed: ");     Serial.println(RST_pressed);
   }
 
 // Manual Movement
@@ -2226,6 +2394,7 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
   {
     Serial.print("i: ");                   Serial.print(i);
     Serial.print(", Compression_perc: ");  Serial.print(Compression_perc);
+    //Serial.print(", adj_v[i]: ");          Serial.println(adj_v[i]);
     Serial.print(", adj_v[i] %: ");        Serial.println(adj_v[i]);
     Serial.print("BPM: ");                 Serial.print(BPM);
     Serial.print(", insp_pressure: ");     Serial.print(insp_pressure);
