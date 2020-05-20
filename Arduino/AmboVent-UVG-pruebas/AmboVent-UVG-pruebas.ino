@@ -37,11 +37,12 @@
 #define pressure_sensor_available 1 // 1 - you have installed an I2C pressure sensor 
 #define central_monitor_system 0    // 1 - send unique ID for 10 seconds upon startup, 0 - dont
 
-// options for display and debug via serial com
-#define send_to_monitor 1     // 1 = send data to monitor  0 = dont
+// options for display, debug and logging data via serial com
+//#define send_to_monitor 1     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemetry for debugging
+#define LOGGER 0  // 1 - send log data. This will disable the telemetry, even if telemetry == 1
 #define DELTA_TELE_MONITOR 250  // Delta time (in ms) for displaying telemetry and info to monitor
-#define DELTA_LCD_REFRESH 150
+#define DELTA_LCD_REFRESH  150
 
 // UI
 #define deltaUD 5       // define the value change per each button press
@@ -49,8 +50,8 @@
 
 // clinical
 // PROBAR DEJAR LOS SIGUIENTES DOS IGUALES, Y VARIARLOS AL MISMO TIEMPO.
-#define perc_of_lower_volume 30.0       // % of max press - defines lower volume  // 50.0
-#define perc_of_lower_vol_display 30.0  // % of max press - defines lower volume to display when reaching the real lower volume // 33.0
+#define perc_of_lower_volume      30  // % of max press - defines lower volume  // 50.0
+#define perc_of_lower_vol_display 30  // % of max press - defines lower volume to display when reaching the real lower volume // 33.0
 
 #define wait_time_after_resistance 3    // seconds to wait before re-attempt to push air after max pressure was achieved 
 #define max_pres_disconnected 10        // if the max pressure during breathing cycle does not reach this value - pipe is disconnected
@@ -147,7 +148,6 @@
 #include <EEPROM.h>
 //#include <Servo.h> 
 #include <Wire.h>    // Used for I2C
-//#include <SparkFun_MS5803_I2C.h>
 #include "Adafruit_MPRLS.h"
 #include <LiquidCrystal_I2C.h>
 #include "ArduinoUniqueID.h"
@@ -155,7 +155,6 @@
 //Servo motor;  //TODO: define a constant to select the driver
 
 #if pressure_sensor_available == 1
-//MS5803 sparkfumPress(ADDRESS_HIGH);
 Adafruit_MPRLS adafruitPress(-1, -1);  // Default values
 #endif
 
@@ -200,7 +199,7 @@ const PROGMEM byte vel[profile_length] =
 
 // Alarms: disconnected, motion_failure, high_pressure_detected,
 //         safety_pressure_detected, patient_triggered_breath,
-//         in_wait, hold_breath
+//         in_wait, hold_breath, calibON
 byte Alarms;
 #define disconnected              7
 #define motion_failure            6
@@ -209,6 +208,7 @@ byte Alarms;
 #define patient_triggered_breath  3
 #define in_wait                   2
 #define hold_breath               1
+#define calibON                   0  // should be on Status, but we ran out of space
 
 // Status: USR_status, calibrated, manual_mov_enabled, CONFIG_enabled,
 //         save_cancelled, progress, send_beep, sent_LCD
@@ -242,25 +242,27 @@ byte Buttons2;
 #define RST_pressed               4
 
 
-byte calibON, menu_state;
-byte monitor_index = 0, BPM = 14, prev_BPM, failure, wanted_cycle_time;
+byte menu_state;
+// byte monitor_index = 0, 
+byte BPM = 14, prev_BPM, failure, wanted_cycle_time;
 
 // For the detection of push buttons
 byte counter_SW2_ON, counter_SW2_OFF, counter_TST_ON, counter_TST_OFF,
      counter_RST_ON, counter_RST_OFF;
 
 byte insp_pressure, prev_insp_pressure, safety_pressure_counter, no_fail_counter,
-     motion_time,
+     motion_time, Compression_perc = 80, prev_Compression_perc,
      telemetry_option = 0, adjusting_params = 0;
 
-int A_pot, prev_A_pot, A_current, Compression_perc = 80, prev_Compression_perc,
-    A_rate, A_comp, A_pres;
+int A_pot, prev_A_pot, A_current, A_rate, A_comp, A_pres;
 int motorPWM, index = 0, prev_index, i, wait_cycles, cycle_number, cycles_lost,
     index_last_motion, pos_from_pot;
 int pressure_abs, breath_cycle_time, max_pressure = 0, prev_max_pressure = 0,
     min_pressure = 100, prev_min_pressure = 0, index_to_hold_breath, pressure_baseline;
 int comp_pot_low = 0, comp_pot_high = 1023, rate_pot_low = 0, rate_pot_high = 1023,
     pres_pot_low = 0, pres_pot_high = 1023;
+
+int max_wanted_pos, min_wanted_pos, max_A_pot, min_A_pot;
 
 unsigned int max_arm_pos, min_arm_pos;
 unsigned long lastSent, lastIndex, lastUSRblink, last_TST_not_pressed, lastBlue,
@@ -278,8 +280,9 @@ byte adj_v[N_adj] = {100, 100, 100, 100, 100, 100, 100, 100,
                      100, 100, 100, 100, 100, 100, 100};
 byte adj_v_temp[N_adj], adj_ind;
 float adj_val;
-byte Compression_perc_v[N_adj] = {30, 35, 40, 45, 50, 55, 60, 65,
-                                  70, 75, 80, 85, 90, 95, 100};
+
+const PROGMEM byte Comp_perc_v[N_adj] = {30, 35, 40, 45, 50, 55, 60, 65,
+                                         70, 75, 80, 85, 90, 95, 100};
 
 enum main_states:byte {STBY_STATE, BREATH_STATE, MENU_STATE};
 enum main_states state;
@@ -315,9 +318,6 @@ void setup()
   Wire.begin();
 
 #if pressure_sensor_available == 1
-//  sparkfumPress.reset();
-//  sparkfumPress.begin();
-//  pressure_baseline = sparkfumPress.getPressure(ADC_4096);
   adafruitPress.begin();
   pressure_baseline = adafruitPress.readPressure();
 #endif
@@ -326,8 +326,8 @@ void setup()
   lcd.begin();      // initialize the LCD
   lcd.backlight();  // Turn on the backlight and print a message.
   lcd.setCursor(0, 0);  lcd.print("    AmboVent    ");
-  lcd.setCursor(0, 1);  lcd.print("   UVG+HUMANA   ");
-  delay(1000);
+  lcd.setCursor(0, 1);  lcd.print("  UVG + HUMANA  ");
+  delay(2000);
 #endif
 
 #if central_monitor_system==1
@@ -383,6 +383,7 @@ void setup()
   bitClear(Alarms, disconnected);
   bitClear(Alarms, motion_failure);
   bitClear(Alarms, high_pressure_detected);
+  bitClear(Alarms, calibON);
   bitClear(Status, manual_mov_enabled);  // Will be updated at the first read_IO
   bitClear(Status, CONFIG_enabled);      // Will be updated at the first read_IO
   bitClear(Status, save_cancelled);
@@ -466,10 +467,11 @@ void loop()
   
   if(millis() - last_sent_data > DELTA_TELE_MONITOR)
   { 
-    if(send_to_monitor == 1 && telemetry == 0)
-      send_data_to_monitor();
+    // if(send_to_monitor == 1 && telemetry == 0)
+      // send_data_to_monitor();
 
-    if(telemetry == 1)
+//    if(telemetry == 1)
+    if(telemetry == 1 && LOGGER == 0)
       print_tele();
 
     last_sent_data = millis();
@@ -501,8 +503,18 @@ void display_menu()
       if(bitRead(Buttons1, TST_pressed))
       {
 #if pressure_sensor_available == 1
-        //pressure_baseline = int(sparkfumPress.getPressure(ADC_4096));
         pressure_baseline = int(adafruitPress.readPressure());
+#endif
+
+      // Poner mensaje confirmando calibración, dar un delay.
+#if LCD_available == 1
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Press. calibr.");
+        lcd.setCursor(0, 1);
+        lcd.print("Base: ");
+        lcd.print(pressure_baseline);
+        delay(2000);
 #endif
         exit_menu();
       }
@@ -536,7 +548,7 @@ void display_menu()
 
       if(bitRead(Buttons1, TST_pressed))
       {
-        calibrate_arm_range();  // AGREGAR MOVIMIENTO MANUAL
+        calibrate_arm_range();
         exit_menu();
       }
 
@@ -610,6 +622,7 @@ void display_menu()
         
         if(bitRead(Buttons1, TST_pressed))
         {
+          bitSet(Alarms, calibON);
           telemetry_option = 1;
           move_arm_with_pot();
 
@@ -638,6 +651,8 @@ void display_menu()
         if(bitRead(Buttons1, TST_pressed))
         {
           telemetry_option = 2;
+          bitSet(Alarms, calibON);
+
 // Primero colocar los pots en la posición correspondiente a las
 // constantes actuales, para que no haya cambios bruscos.
           align_PID_pots();
@@ -718,6 +733,7 @@ void display_menu()
         {
           telemetry_option = 3;
           adjusting_params = 2;
+          bitSet(Alarms, calibON);
           bitClear(Status, save_cancelled);
           delay(100);  // give some time for TST_pressed to change back to 0
 
@@ -792,7 +808,7 @@ void exit_menu()
   last_TST_not_pressed = millis();
   state = STBY_STATE;
   index = 0;
-  calibON = 0;
+  bitClear(Alarms, calibON);
   telemetry_option = 0;
 
 #if LCD_available == 1
@@ -894,30 +910,31 @@ void calculate_wanted_pos_vel()
 // Adjust the wanted_pos vector, according to the adj_v values, which
 // are calibrated to match the actual volumes corresponding to the
 // compression_perc.
-  adj_ind = map(Compression_perc, int(perc_of_lower_volume), 100, 0, N_adj-1);
+  adj_ind = map(Compression_perc, byte(perc_of_lower_volume), 100, 0, N_adj-1);
   adj_ind = constrain(adj_ind, 0, N_adj-1);
 
 // If the Compression_perc matches one of the predefined (calibrated percentages),
 // use the corresponding adj_v. If not, interpolate.
-  if(Compression_perc == Compression_perc_v[adj_ind])
+  if(Compression_perc == pgm_read_byte_near(Comp_perc_v + adj_ind))
     adj_val = adj_v[adj_ind]/100.0;
-  else if(Compression_perc > Compression_perc_v[adj_ind])
+  else if(Compression_perc > pgm_read_byte_near(Comp_perc_v + adj_ind))
   {
-    adj_val = (1.0*(Compression_perc - Compression_perc_v[adj_ind])*
-              (adj_v[adj_ind+1] - adj_v[adj_ind])/
-              (Compression_perc_v[adj_ind+1] - Compression_perc_v[adj_ind]) +
-              1.0*adj_v[adj_ind])/100.0;
+    adj_val = (1.0*(Compression_perc - pgm_read_byte_near(Comp_perc_v + adj_ind))*
+              (adj_v[adj_ind + 1] - adj_v[adj_ind])/
+              (pgm_read_byte_near(Comp_perc_v + adj_ind + 1) - 
+               pgm_read_byte_near(Comp_perc_v + adj_ind)) + 1.0*adj_v[adj_ind])/100.0;
   }
   else
   {
-    adj_val = (1.0*(Compression_perc - Compression_perc_v[adj_ind-1])*
-              (adj_v[adj_ind] - adj_v[adj_ind-1])/
-              (Compression_perc_v[adj_ind] - Compression_perc_v[adj_ind-1]) +
-              1.0*adj_v[adj_ind-1])/100.0;
+    adj_val = (1.0*(Compression_perc - pgm_read_byte_near(Comp_perc_v + adj_ind - 1))*
+              (adj_v[adj_ind] - adj_v[adj_ind - 1])/
+              (pgm_read_byte_near(Comp_perc_v + adj_ind) - 
+               pgm_read_byte_near(Comp_perc_v + adj_ind - 1)) + 1.0*adj_v[adj_ind - 1])/100.0;
   }
 
   // wanted pos in pot clicks
   wanted_pos = adj_val*float(pos_from_profile)*range/255 + min_arm_pos;
+  wanted_pos = constrain(wanted_pos, 0.0, 1023.0);
 
   // vel in clicks per 0.2? second
   profile_planned_vel = (float(vel_from_profile) - 128.01)*range/255;
@@ -964,6 +981,21 @@ void calculate_wanted_pos_vel()
 
   // reduce speed for longer cycles
   wanted_vel_PWM = wanted_vel_PWM*float(cycleTime)/float(wanted_cycle_time);
+
+#if LOGGER == 1
+  if(int(wanted_pos) < min_wanted_pos)
+    min_wanted_pos = int(wanted_pos);
+
+  if(int(wanted_pos) > max_wanted_pos)
+    max_wanted_pos = int(wanted_pos);
+
+  if(A_pot < min_A_pot)
+    min_A_pot = A_pot;
+
+  if(A_pot > max_A_pot)
+    max_A_pot = A_pot;
+#endif
+
 }
 
 
@@ -1030,6 +1062,25 @@ void start_new_cycle()
   bitSet(Status, send_beep);
   bitClear(Status, sent_LCD);
   bitClear(Alarms, high_pressure_detected);
+
+// If logging is enabled, and the system is in the breathing state, send the data.
+#if LOGGER == 1
+  if(state == BREATH_STATE)
+  {
+    Serial.println(min_wanted_pos);
+    Serial.println(max_wanted_pos);
+    Serial.println(min_A_pot);
+    Serial.println(max_A_pot);
+    Serial.println(prev_min_pressure);
+    Serial.println(prev_max_pressure);
+
+    // Reset values for next cycle (reseting the pressure vals is done somewhere else)
+    min_wanted_pos = 1023;
+    max_wanted_pos = 0;
+    min_A_pot = 1023;
+    max_A_pot = 0;
+  }
+#endif
 }
 
 // Maps back to 0 - 1023 interval
@@ -1198,7 +1249,7 @@ void display_pot_during_calib()
 void calibrate_arm_range()   // used for calibaration of motion range
 {
   LED_USR(1);
-  calibON = 1;
+//  bitSet(Alarms, calibON);  // NO ES NECESARIO, NO SE REVISA ANTES DE CLEAREARLA
   bitClear(Status, progress);
 
   display_text_calib("Set Upper");
@@ -1254,7 +1305,7 @@ void internal_arm_calib_step()
     digitalWrite(pin_INA, LOW);
     digitalWrite(pin_INB, HIGH);
 
-    motorPWM = 60;  // set between 0 and 255
+    motorPWM = 50;  // set between 0 and 255
     analogWrite(pin_PWM, motorPWM);
     delay(100);
     analogWrite(pin_PWM, 0);
@@ -1267,7 +1318,7 @@ void internal_arm_calib_step()
 void calibrate_pot_range()   // used for calibaration of potentiometers
 { 
   LED_USR(1);
-  calibON = 2;
+//  calibON = 2;  // NO ES NECESARIO, NO SE REVISA ANTES DE CLEAREARLA
 
   read_IO();
   display_text_calib("Pot to left pos");
@@ -1326,7 +1377,8 @@ void move_arm_with_pot()
       {
         last_sent_data = millis();  // last time telemetry was displayed
 
-        if(telemetry == 1)
+//        if(telemetry == 1)
+        if(telemetry == 1 && LOGGER == 0)
           print_tele();
       }
     }
@@ -1403,7 +1455,7 @@ void set_pos_vel_with_pot()
 #if LCD_available == 1
 void display_LCD()  // here function that sends data to LCD
 {
-  if(calibON == 0 && state != MENU_STATE) 
+  if(bitRead(Alarms, calibON) == 0 && state != MENU_STATE) 
   {
     lcd.clear();
     lcd.setCursor(0, 0);
@@ -1456,8 +1508,10 @@ void set_motor_PWM(float wanted_vel_PWM)
   if(abs(A_pot - prev_A_pot) > 0 || abs(wanted_vel_PWM) < 15)
     index_last_motion = index;
 
-  if(calibON == 1)
+/*
+  if(bitRead(Alarms, calibON) == 1)
     wanted_vel_PWM = read_motion_for_calib();  // allows manual motion during calibration
+*/
 
   if(invert_mot)
     wanted_vel_PWM = -wanted_vel_PWM;
@@ -1468,7 +1522,7 @@ void set_motor_PWM(float wanted_vel_PWM)
       wanted_vel_PWM = 0;
   }
 
-  if(bitRead(Alarms, motion_failure) == 1 && calibON == 0)
+  if(bitRead(Alarms, motion_failure) == 1 && bitRead(Alarms, calibON) == 0)
     wanted_vel_PWM = 0;
 
   if(wanted_vel_PWM > 0)
@@ -1505,6 +1559,7 @@ void set_motor_PWM(float wanted_vel_PWM)
 }
 
 // REVISAR SI REALMENTE USAMOS ESTA FUNCIÓN (ESTA OPCIÓN)
+/*
 int read_motion_for_calib()
 {
   int wanted_cal_PWM;
@@ -1526,6 +1581,7 @@ int read_motion_for_calib()
 
   return(wanted_cal_PWM);
 }
+*/
 
 void store_prev_values()
 {
@@ -1560,7 +1616,8 @@ void align_PID_pots()
 
     if(millis() - last_sent_data > DELTA_TELE_MONITOR)
     { 
-      if(telemetry == 1)
+//      if(telemetry == 1)
+      if(telemetry == 1 && LOGGER == 0)
         print_tele();
 
       last_sent_data = millis();
@@ -1593,7 +1650,8 @@ void align_PID_pots()
 
     if(millis() - last_sent_data > DELTA_TELE_MONITOR)
     { 
-      if(telemetry == 1)
+//      if(telemetry == 1)
+      if(telemetry == 1 && LOGGER == 0)
         print_tele();
 
       last_sent_data = millis();
@@ -1625,8 +1683,9 @@ void align_PID_pots()
       KI_temp = constrain(KI_temp, KI_MIN, KI_MAX);
 
     if(millis() - last_sent_data > DELTA_TELE_MONITOR)
-    { 
-      if(telemetry == 1)
+    {
+//      if(telemetry == 1)
+      if(telemetry == 1 && LOGGER == 0)
         print_tele();
 
       last_sent_data = millis();
@@ -1694,7 +1753,8 @@ void adj_v_module()
 
   for(i = 0; i < N_adj; i++)
   {
-    Compression_perc = (int)(Compression_perc_v[i]);
+//    Compression_perc = (int)(Compression_perc_v[i]);
+    Compression_perc = (byte)(pgm_read_byte_near(Comp_perc_v + i));
 
     read_IO();
 
@@ -1712,8 +1772,9 @@ void adj_v_module()
       }
 
       if(millis() - last_sent_data > DELTA_TELE_MONITOR)
-      { 
-        if(telemetry == 1)
+      {
+//        if(telemetry == 1)
+        if(telemetry == 1 && LOGGER == 0)
           print_tele();
 
         last_sent_data = millis();
@@ -1736,7 +1797,6 @@ void adj_v_module()
   // Save adjustment vector values to the EEPROM
     for(i = 0; i < N_adj; i++)
     {
-      // EEPROM.put(36 + (3+i)*sizeof(float), adj_v[i]);
       EEPROM.put(36 + 3*sizeof(float) + i*sizeof(byte), adj_v[i]);
       delay(200);
     }
@@ -2020,7 +2080,7 @@ void read_IO()
 
   if(adjusting_params != 2)  // Adj_v NOT being calibrated
   {
-    Compression_perc = perc_of_lower_vol_display + int(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
+    Compression_perc = perc_of_lower_vol_display + byte(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
     Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
   }
 
@@ -2040,12 +2100,13 @@ void read_IO()
 #endif
   }
 
-  range_factor = perc_of_lower_volume +
-                (Compression_perc - perc_of_lower_vol_display)*(100 - perc_of_lower_volume)/(100 - perc_of_lower_vol_display);
-  range_factor = range_factor/100;
+  range_factor = 1.0*perc_of_lower_volume +
+                1.0*(Compression_perc - perc_of_lower_vol_display)*
+                    (100 - perc_of_lower_volume)/(100 - perc_of_lower_vol_display);
+  range_factor = range_factor/100.0;
 
-  if(range_factor > 1)
-    range_factor = 1;
+  if(range_factor > 1.0)
+    range_factor = 1.0;
 
   if(range_factor < 0)
     range_factor = 0;
@@ -2055,7 +2116,6 @@ void read_IO()
   {
     last_read_pres = millis();
 
-    //pressure_abs = int(sparkfumPress.getPressure(ADC_4096)-pressure_baseline);   // mbar
     pressure_abs = int(adafruitPress.readPressure() - pressure_baseline);
 
     if(pressure_abs < 0)
@@ -2083,6 +2143,7 @@ void read_IO()
     Buzzer(0);
 }
 
+/*
 void send_data_to_monitor()
 {
   if(monitor_index == 0)
@@ -2116,6 +2177,7 @@ void send_data_to_monitor()
 
   monitor_index = (monitor_index + 1) % 7;
 }
+*/
 
 void LED_FAIL(byte val)
 {

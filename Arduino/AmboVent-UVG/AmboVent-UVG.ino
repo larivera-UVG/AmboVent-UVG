@@ -41,7 +41,7 @@
 #define send_to_monitor 1     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemetry for debugging
 #define DELTA_TELE_MONITOR 250  // Delta time (in ms) for displaying telemetry and info to monitor
-#define DELTA_LCD_REFRESH 150
+#define DELTA_LCD_REFRESH  150
 
 // UI
 #define deltaUD 5       // define the value change per each button press
@@ -49,8 +49,8 @@
 
 // clinical
 // PROBAR DEJAR LOS SIGUIENTES DOS IGUALES, Y VARIARLOS AL MISMO TIEMPO.
-#define perc_of_lower_volume 30.0       // % of max press - defines lower volume  // 50.0
-#define perc_of_lower_vol_display 30.0  // % of max press - defines lower volume to display when reaching the real lower volume // 33.0
+#define perc_of_lower_volume      30  // % of max press - defines lower volume  // 50.0
+#define perc_of_lower_vol_display 30  // % of max press - defines lower volume to display when reaching the real lower volume // 33.0
 
 #define wait_time_after_resistance 3    // seconds to wait before re-attempt to push air after max pressure was achieved 
 #define max_pres_disconnected 10        // if the max pressure during breathing cycle does not reach this value - pipe is disconnected
@@ -147,7 +147,6 @@
 #include <EEPROM.h>
 //#include <Servo.h> 
 #include <Wire.h>    // Used for I2C
-//#include <SparkFun_MS5803_I2C.h>
 #include "Adafruit_MPRLS.h"
 #include <LiquidCrystal_I2C.h>
 #include "ArduinoUniqueID.h"
@@ -155,7 +154,6 @@
 //Servo motor;  //TODO: define a constant to select the driver
 
 #if pressure_sensor_available == 1
-//MS5803 sparkfumPress(ADDRESS_HIGH);
 Adafruit_MPRLS adafruitPress(-1, -1);  // Default values
 #endif
 
@@ -250,11 +248,10 @@ byte counter_SW2_ON, counter_SW2_OFF, counter_TST_ON, counter_TST_OFF,
      counter_RST_ON, counter_RST_OFF;
 
 byte insp_pressure, prev_insp_pressure, safety_pressure_counter, no_fail_counter,
-     motion_time,
+     motion_time, Compression_perc = 80, prev_Compression_perc,
      telemetry_option = 0, adjusting_params = 0;
 
-int A_pot, prev_A_pot, A_current, Compression_perc = 80, prev_Compression_perc,
-    A_rate, A_comp, A_pres;
+int A_pot, prev_A_pot, A_current, A_rate, A_comp, A_pres;
 int motorPWM, index = 0, prev_index, i, wait_cycles, cycle_number, cycles_lost,
     index_last_motion, pos_from_pot;
 int pressure_abs, breath_cycle_time, max_pressure = 0, prev_max_pressure = 0,
@@ -278,8 +275,9 @@ byte adj_v[N_adj] = {100, 100, 100, 100, 100, 100, 100, 100,
                      100, 100, 100, 100, 100, 100, 100};
 byte adj_v_temp[N_adj], adj_ind;
 float adj_val;
-byte Compression_perc_v[N_adj] = {30, 35, 40, 45, 50, 55, 60, 65,
-                                  70, 75, 80, 85, 90, 95, 100};
+
+const PROGMEM byte Comp_perc_v[N_adj] = {30, 35, 40, 45, 50, 55, 60, 65,
+                                         70, 75, 80, 85, 90, 95, 100};
 
 enum main_states:byte {STBY_STATE, BREATH_STATE, MENU_STATE};
 enum main_states state;
@@ -315,9 +313,6 @@ void setup()
   Wire.begin();
 
 #if pressure_sensor_available == 1
-//  sparkfumPress.reset();
-//  sparkfumPress.begin();
-//  pressure_baseline = sparkfumPress.getPressure(ADC_4096);
   adafruitPress.begin();
   pressure_baseline = adafruitPress.readPressure();
 #endif
@@ -326,8 +321,8 @@ void setup()
   lcd.begin();      // initialize the LCD
   lcd.backlight();  // Turn on the backlight and print a message.
   lcd.setCursor(0, 0);  lcd.print("    AmboVent    ");
-  lcd.setCursor(0, 1);  lcd.print("   UVG+HUMANA   ");
-  delay(1000);
+  lcd.setCursor(0, 1);  lcd.print("  UVG + HUMANA  ");
+  delay(2000);
 #endif
 
 #if central_monitor_system==1
@@ -501,7 +496,6 @@ void display_menu()
       if(bitRead(Buttons1, TST_pressed))
       {
 #if pressure_sensor_available == 1
-        //pressure_baseline = int(sparkfumPress.getPressure(ADC_4096));
         pressure_baseline = int(adafruitPress.readPressure());
 #endif
         exit_menu();
@@ -894,26 +888,26 @@ void calculate_wanted_pos_vel()
 // Adjust the wanted_pos vector, according to the adj_v values, which
 // are calibrated to match the actual volumes corresponding to the
 // compression_perc.
-  adj_ind = map(Compression_perc, int(perc_of_lower_volume), 100, 0, N_adj-1);
+  adj_ind = map(Compression_perc, byte(perc_of_lower_volume), 100, 0, N_adj-1);
   adj_ind = constrain(adj_ind, 0, N_adj-1);
 
 // If the Compression_perc matches one of the predefined (calibrated percentages),
 // use the corresponding adj_v. If not, interpolate.
-  if(Compression_perc == Compression_perc_v[adj_ind])
+  if(Compression_perc == pgm_read_byte_near(Comp_perc_v + adj_ind))
     adj_val = adj_v[adj_ind]/100.0;
-  else if(Compression_perc > Compression_perc_v[adj_ind])
+  else if(Compression_perc > pgm_read_byte_near(Comp_perc_v + adj_ind))
   {
-    adj_val = (1.0*(Compression_perc - Compression_perc_v[adj_ind])*
-              (adj_v[adj_ind+1] - adj_v[adj_ind])/
-              (Compression_perc_v[adj_ind+1] - Compression_perc_v[adj_ind]) +
-              1.0*adj_v[adj_ind])/100.0;
+    adj_val = (1.0*(Compression_perc - pgm_read_byte_near(Comp_perc_v + adj_ind))*
+              (adj_v[adj_ind + 1] - adj_v[adj_ind])/
+              (pgm_read_byte_near(Comp_perc_v + adj_ind + 1) - 
+               pgm_read_byte_near(Comp_perc_v + adj_ind)) + 1.0*adj_v[adj_ind])/100.0;
   }
   else
   {
-    adj_val = (1.0*(Compression_perc - Compression_perc_v[adj_ind-1])*
-              (adj_v[adj_ind] - adj_v[adj_ind-1])/
-              (Compression_perc_v[adj_ind] - Compression_perc_v[adj_ind-1]) +
-              1.0*adj_v[adj_ind-1])/100.0;
+    adj_val = (1.0*(Compression_perc - pgm_read_byte_near(Comp_perc_v + adj_ind - 1))*
+              (adj_v[adj_ind] - adj_v[adj_ind - 1])/
+              (pgm_read_byte_near(Comp_perc_v + adj_ind) - 
+               pgm_read_byte_near(Comp_perc_v + adj_ind - 1)) + 1.0*adj_v[adj_ind - 1])/100.0;
   }
 
   // wanted pos in pot clicks
@@ -1694,7 +1688,8 @@ void adj_v_module()
 
   for(i = 0; i < N_adj; i++)
   {
-    Compression_perc = (int)(Compression_perc_v[i]);
+//    Compression_perc = (int)(Compression_perc_v[i]);
+    Compression_perc = (byte)(pgm_read_byte_near(Comp_perc_v + i));
 
     read_IO();
 
@@ -1736,7 +1731,6 @@ void adj_v_module()
   // Save adjustment vector values to the EEPROM
     for(i = 0; i < N_adj; i++)
     {
-      // EEPROM.put(36 + (3+i)*sizeof(float), adj_v[i]);
       EEPROM.put(36 + 3*sizeof(float) + i*sizeof(byte), adj_v[i]);
       delay(200);
     }
@@ -2020,7 +2014,7 @@ void read_IO()
 
   if(adjusting_params != 2)  // Adj_v NOT being calibrated
   {
-    Compression_perc = perc_of_lower_vol_display + int(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
+    Compression_perc = perc_of_lower_vol_display + byte(float(A_comp)*(100 - perc_of_lower_vol_display)/1023);
     Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
   }
 
@@ -2040,12 +2034,13 @@ void read_IO()
 #endif
   }
 
-  range_factor = perc_of_lower_volume +
-                (Compression_perc - perc_of_lower_vol_display)*(100 - perc_of_lower_volume)/(100 - perc_of_lower_vol_display);
-  range_factor = range_factor/100;
+  range_factor = 1.0*perc_of_lower_volume +
+                1.0*(Compression_perc - perc_of_lower_vol_display)*
+                    (100 - perc_of_lower_volume)/(100 - perc_of_lower_vol_display);
+  range_factor = range_factor/100.0;
 
-  if(range_factor > 1)
-    range_factor = 1;
+  if(range_factor > 1.0)
+    range_factor = 1.0;
 
   if(range_factor < 0)
     range_factor = 0;
@@ -2055,7 +2050,6 @@ void read_IO()
   {
     last_read_pres = millis();
 
-    //pressure_abs = int(sparkfumPress.getPressure(ADC_4096)-pressure_baseline);   // mbar
     pressure_abs = int(adafruitPress.readPressure() - pressure_baseline);
 
     if(pressure_abs < 0)
