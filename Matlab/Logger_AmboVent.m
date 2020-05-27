@@ -5,14 +5,18 @@
 clc;
 pause(0.1);
 
-BPM = 24;      % Ciclos por minuto. Hacer coincidir con el programa de Arduino.
+BPM = 20;      % Ciclos por minuto. Hacer coincidir con el programa de Arduino.
+
+% CAMBIAR: QUE NO SE NECESITE FIJAR EL COMP_PER. QUE EL PROGRAMA DEL ARDUINO MANDE LOS
+% MÁXIMOS Y MÍNIMOS TEÓRICOS DEL WANTED_POS, SEGÚN SEAN EL COMPRESSION_PER.
 Comp_per = 80; % Porcentaje de compresión. Hacer coincidir con el programa de Arduino.
-T_total = 1.5/60;  % Tiempo, en horas
+T_total = 5/60;  % Tiempo, en horas
 N = ceil(T_total*60*BPM);   % número de muestras
 
-M = 6;  % número de datos por ciclo. Debe coincidir con el programa del Arduino
-datos = zeros(N,4);
+M = 7;  % número de datos por ciclo. Debe coincidir con el programa del Arduino
+datos = zeros(N,M);
 tiempo = zeros(N,1);
+
 n = 1;
 while(true)
     nombre_archivo = sprintf('AV_Log_%s_%02d.mat', date, n);
@@ -23,19 +27,21 @@ while(true)
     end
 end
 
-%% Inicializar gráficas y handlers
+% Inicializar gráficas y handlers
 % Tiempos medidos ------------------------------------------------------------------------
 figure(1); clf;
-% h11 = animatedline('Color','b');
-h11 = plot(2:N, (60/BPM)*ones(1,N-1), 'b');
+h11 = animatedline('Color','b');
+% h11 = plot(2:N, (60/BPM)*ones(1,N-1), 'b');
 hold on;
 h12 = animatedline('Color','r');
 xlabel('número de ciclo');
 ylabel('tiempo (seg)');
 xlim([0, N]);
-ylim([60/BPM-1,60/BPM+1]);
+% ylim([60/BPM-1,60/BPM+1]);
+ylim([1, 11]);
 legend('Teórico', 'Medido');
-title(sprintf('Tiempos entre mediciones. Teórico: %0.2f', 60/BPM));
+% title(sprintf('Tiempos entre mediciones. Teórico: %0.2f', 60/BPM));
+title('Tiempos entre mediciones');
 grid on;
 
 % Posiciones calculadas y medidas del potenciómetro de feedback --------------------------
@@ -65,11 +71,13 @@ title('Máximos y Mínimos de Presión');
 legend('Máximos', 'Mínimos');
 grid on;
 
+pause(0.1);
 
-%% Crear objeto serial y abrir el puerto
+% Crear objeto serial y abrir el puerto
 % instrreset; % sólo si se tiene el Instrument Control Toolbox
 delete(instrfind);  % Para evitar problemas al abrir y cerrar.
-sObj = serial('COM20','BaudRate',115200);  % REVISAR EL PUERTO
+sObj = serial('COM28','BaudRate',115200);  % REVISAR EL PUERTO
+sObj.Timeout = 30;
 fopen(sObj);
 
 fprintf('PRESIONE START...\n\n');
@@ -91,6 +99,7 @@ for n = 1:N
     fprintf('Iteración: %d/%d\n', n, N);
     
     if(n > 2)
+        addpoints(h11, n, 60/datos(n,7));
         addpoints(h12, n, tiempo(n));
         
         addpoints(h21, n, datos(n,2));
@@ -104,6 +113,9 @@ for n = 1:N
         drawnow limitrate
     end
 end
+
+figure(3);
+ylim([(min([0; datos(2:N,5)])-1), (max([9; datos(2:N,6)])+1)]);
 
 save(nombre_archivo, 'datos', 'tiempo', 'BPM', 'T_total', 'N', 'M', 'Comp_per');
 
@@ -144,5 +156,5 @@ fclose(sObj);
 % legend('Máximos', 'Mínimos');
 % grid on;
 
-figure(3);
-ylim([(min([0; datos(2:N,5)])-1), (max([9; datos(2:N,6)])+1)]);
+% figure(3);
+% ylim([(min([0; datos(2:N,5)])-1), (max([9; datos(2:N,6)])+1)]);

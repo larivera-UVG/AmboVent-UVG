@@ -107,8 +107,9 @@ motion_time = 35;  % in 100 ms --> el tiempo real es motion_time*100 ms
                    % se restringe entre 25 y 50, i.e, entre 2.5 y 5.0 seg
 
 %A_freq = analogRead(pin_FRQ); % Debería estar entre 0 y 1023
-A_freq = 0:1023;
-BPM = floor(6 + (A_freq - 23)/55);  % inicial: 14, rango entre 6 y 30 (según imagen en el pdf)
+A_freq = (0:1023)';
+% BPM = floor(6 + (A_freq - 23)/55);  % inicial: 14, rango entre 6 y 30 (según imagen en el pdf)
+BPM = floor(6 + 24*A_freq/1023);
 breath_cycle_time = 60000./BPM + 100;
 wanted_cycle_time = 100*(motion_time/profile_length)*ones(size(breath_cycle_time));
 

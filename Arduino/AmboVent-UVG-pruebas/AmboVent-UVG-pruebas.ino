@@ -35,6 +35,7 @@
 
 // system configuration
 #define pressure_sensor_available 1 // 1 - you have installed an I2C pressure sensor 
+#define curr_sense 0
 #define central_monitor_system 0    // 1 - send unique ID for 10 seconds upon startup, 0 - dont
 
 // options for display, debug and logging data via serial com
@@ -71,8 +72,6 @@
 #define pin_RST 6         // reset alarm
 #define pin_LED_USR  7    // User LED
 #define pin_LED_FAIL 8    // FAIL and calib: red LED
-//  #define pin_LED_FREQ 9    // frequency: green LED
-//  #define pin_LED_AMP 10    // amplitude: blue LED
 
 // !! REVISAR EL PIN QUE SE USARÁ
 #define pin_BUZZER 9
@@ -83,7 +82,6 @@
 #define pin_EVALV1_STAT 13  // Electrovalve 1 satus
 #define pin_EVALV2_STAT 13  // Electrovalve 2 status
 
-#define curr_sense 0
 
 #define MIN_ARM_POS_DEF 150
 #define MAX_ARM_POS_DEF 550
@@ -133,7 +131,7 @@
 #define max_allowed_current 100 // 100 <=> 10 Amps
 
 // motion control parameters
-#define cycleTime 10          // milisec
+#define cycleTime 8          // milisec  originalmente: 10
 #define alpha 0.95            // filter for current apatation - higher = stronger low pass filter
 #define profile_length 250    // motion control profile length
 #define motion_control_allowed_error  80  // % of range 30, 40
@@ -254,9 +252,13 @@ byte insp_pressure, prev_insp_pressure, safety_pressure_counter, no_fail_counter
      motion_time, Compression_perc = 80, prev_Compression_perc,
      telemetry_option = 0, adjusting_params = 0;
 
-int A_pot, prev_A_pot, A_current, A_rate, A_comp, A_pres;
-int motorPWM, index = 0, prev_index, i, wait_cycles, cycle_number, cycles_lost,
-    index_last_motion, pos_from_pot;
+// Eran tipo int
+byte motorPWM, index = 0, prev_index, i, cycle_number, cycles_lost,
+     index_last_motion;
+
+int A_pot, prev_A_pot, A_rate, A_comp, A_pres; // A_current
+int wait_cycles, pos_from_pot;
+
 int pressure_abs, breath_cycle_time, max_pressure = 0, prev_max_pressure = 0,
     min_pressure = 100, prev_min_pressure = 0, index_to_hold_breath, pressure_baseline;
 int comp_pot_low = 0, comp_pot_high = 1023, rate_pot_low = 0, rate_pot_high = 1023,
@@ -270,8 +272,8 @@ unsigned long lastSent, lastIndex, lastUSRblink, last_TST_not_pressed, lastBlue,
 
 float pot_rate, pot_pres, pot_comp, avg_pres;
 float wanted_pos, wanted_vel_PWM, range, range_factor, profile_planned_vel,
-      planned_vel, integral, error, prev_error, f_reduction_up,
-      wanted_manual_vel_PWM;
+      planned_vel, integral, error, prev_error, f_reduction_up;
+      //wanted_manual_vel_PWM;
 
 float FF = FF_DEF, KP = KP_DEF, KI = KI_DEF, FF_temp, KP_temp, KI_temp;
 
@@ -330,7 +332,7 @@ void setup()
   delay(2000);
 #endif
 
-#if central_monitor_system==1
+#if central_monitor_system == 1
   for(i = 0; i < 100; i++)
   {
     UniqueIDdump(Serial);  
@@ -467,10 +469,6 @@ void loop()
   
   if(millis() - last_sent_data > DELTA_TELE_MONITOR)
   { 
-    // if(send_to_monitor == 1 && telemetry == 0)
-      // send_data_to_monitor();
-
-//    if(telemetry == 1)
     if(telemetry == 1 && LOGGER == 0)
       print_tele();
 
@@ -486,42 +484,7 @@ void display_menu()
 
   switch(menu_state)
   {
-    case 1:     // calib pot
-      display_text_2_lines("Calibrate Pots", "TEST to start");
-
-      if(bitRead(Buttons1, TST_pressed))
-      {
-        calibrate_pot_range();
-        exit_menu();
-      }
-
-      break;
-
-    case 2:     // calib pressure sensor
-      display_text_2_lines("Calib pressure", "TEST to start");
-
-      if(bitRead(Buttons1, TST_pressed))
-      {
-#if pressure_sensor_available == 1
-        pressure_baseline = int(adafruitPress.readPressure());
-#endif
-
-      // Poner mensaje confirmando calibración, dar un delay.
-#if LCD_available == 1
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Press. calibr.");
-        lcd.setCursor(0, 1);
-        lcd.print("Base: ");
-        lcd.print(pressure_baseline);
-        delay(2000);
-#endif
-        exit_menu();
-      }
-
-      break;
-
-    case 3:     // move arm down once
+    case 1:     // move arm down once
       if(bitRead(Status, progress) == 0)
       {
         display_text_2_lines("Press TEST to", "run one breath  ");
@@ -542,17 +505,58 @@ void display_menu()
       }
 
       break;
- 
+
+
+    case 2:     // calib pot
+      display_text_2_lines("Calibrate Pots", "TEST to start");
+
+      if(bitRead(Buttons1, TST_pressed))
+      {
+        calibrate_pot_range();
+      // Confirmation message displayed in previous function
+        exit_menu();
+      }
+
+      break;
+
+
+    case 3:     // calib pressure sensor
+      display_text_2_lines("Calib pressure", "TEST to start");
+
+      if(bitRead(Buttons1, TST_pressed))
+      {
+#if pressure_sensor_available == 1
+        pressure_baseline = int(adafruitPress.readPressure());
+#endif
+
+      // Confirmation message
+#if LCD_available == 1
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Press. calibr.");
+        lcd.setCursor(0, 1);
+        lcd.print("Base: ");
+        lcd.print(pressure_baseline);
+        delay(2000);
+#endif
+        exit_menu();
+      }
+
+      break;
+
+
     case 4:     // calib arm range of movement
       display_text_2_lines("Calibrate Arm", "TEST to start");
 
       if(bitRead(Buttons1, TST_pressed))
       {
         calibrate_arm_range();
+      // Confirmation message displayed in previous function
         exit_menu();
       }
 
       break;
+
 
     case 5:     // set motion profile total time
       display_text_2_lines("Set Motion Time", "TEST to start ");
@@ -565,8 +569,8 @@ void display_menu()
         {
           read_IO();
 
-          motion_time = map(pot_rate, 0, 1023, 25, 50);
-          motion_time = constrain(motion_time, 25, 50);
+          motion_time = map(pot_rate, 0, 1023, 20, 50);  // ..., 25, 50);
+          motion_time = constrain(motion_time, 20, 50);  // ..., 25, 50);
 
           if(millis() - lastUSRblink > DELTA_LCD_REFRESH)
           {
@@ -583,11 +587,21 @@ void display_menu()
           }
         }
 
-        delay(500);
+      // Confirmation message
+#if LCD_available == 1
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Motion Time Set");
+        lcd.setCursor(0, 1);
+        lcd.print(int(100*motion_time));
+        lcd.print(" mSec");
+        delay(2000);
+#endif
         exit_menu();
       }
 
       break;
+
 
     case 6:     // toggle sync to patient
       if(bitRead(Alarms, patient_triggered_breath) == 1)
@@ -615,38 +629,10 @@ void display_menu()
 
       break;
 
-    case 7:    // Manual movement of the arm, if enabled
-      if(bitRead(Status, manual_mov_enabled))
-      {
-        display_text_2_lines("Manual Movement", "TEST to start");
-        
-        if(bitRead(Buttons1, TST_pressed))
-        {
-          bitSet(Alarms, calibON);
-          telemetry_option = 1;
-          move_arm_with_pot();
-
-          delay(500);
-          exit_menu();
-        }
-      }
-      else
-      {
-        display_text_2_lines("Man Mov Disbld.", "Press TEST");
-
-        if(bitRead(Buttons1, TST_pressed))
-        {
-          delay(100);
-          exit_menu();
-        }
-      }
-
-      break;
-
-    case 8:    // PID calibration, if enabled
+    case 7:    // Controller calibration, if enabled
       if(bitRead(Status, CONFIG_enabled))
       {
-        display_text_2_lines("PID Calib ", "TEST to start");
+        display_text_2_lines("Ctrl. Calib.", "TEST to start");
 
         if(bitRead(Buttons1, TST_pressed))
         {
@@ -688,15 +674,18 @@ void display_menu()
 
           if(bitRead(Status, save_cancelled) == 0)
           {
+            delay(DELTA_LCD_REFRESH);
+            display_text_2_lines("Ctrl. Calibr.", "Completed");
+
             // Save control constants to the EEPROM
             EEPROM.put(36, FF);                    delay(200);
             EEPROM.put(36 + sizeof(float), KP);    delay(200);
-            EEPROM.put(36 + 2*sizeof(float), KI);  delay(200);
+            EEPROM.put(36 + 2*sizeof(float), KI);  delay(2000);
           }
           else  // if the process was cancelled
           {
-            delay(100);
-            display_text_2_lines("PID Calibration", "Cancelled");
+            delay(DELTA_LCD_REFRESH);
+            display_text_2_lines("Ctrl. Calibr.", "Cancelled");
 
             // Put the former values back
             FF = FF_temp;
@@ -712,7 +701,7 @@ void display_menu()
       }
       else
       {
-        display_text_2_lines("PID Cal Disbld.", "Press TEST");
+        display_text_2_lines("Ctrl Cal Disbld", "Press TEST");
 
         if(bitRead(Buttons1, TST_pressed))
         {
@@ -724,10 +713,10 @@ void display_menu()
       break;
 
 
-    case 9:    // Volume adjustment vector calibration, if enabled
+    case 8:    // Volume adjustment vector calibration, if enabled
       if(bitRead(Status, CONFIG_enabled))
       {
-        display_text_2_lines("Adj_v Calib", "TEST to start");
+        display_text_2_lines("Adj_v Calib.", "TEST to start");
 
         if(bitRead(Buttons1, TST_pressed))
         {
@@ -740,9 +729,11 @@ void display_menu()
           read_IO();
 
           adj_v_module();  // before coming back, the motor will be stopped.
+          // Confirmation message displayed in previous function
 
           telemetry_option = 0;
           adjusting_params = 0;
+
           exit_menu();
         }
       }
@@ -760,19 +751,20 @@ void display_menu()
       break;
 
 
-    case 10:    // FACTORY RESET
+    case 9:    // FACTORY RESET
       if(bitRead(Status, CONFIG_enabled))
       {
         display_text_2_lines("FACTORY RESET", "TEST to reset");
 
         if(bitRead(Buttons1, TST_pressed))
         {
-          factory_reset();  
+          factory_reset();
+          // Confirmation message displayed in previous function
           exit_menu();
         }
         else if(bitRead(Buttons2, RST_pressed))
         {
-          delay(100);
+          delay(DELTA_LCD_REFRESH);
           display_text_2_lines("FACTORY RESET", "Cancelled");
           delay(1000);
           exit_menu();
@@ -791,6 +783,37 @@ void display_menu()
 
       break;
 
+// MEJOR QUITO LO SIGUIENTE, PORQUE LA MEMORIA ESTÁ LLEGANDO AL TOPE, CAUSANDO
+// PROBLEMAS DE INESTABILIDAD (RESETEO DEL ARDUINO)
+/*
+    case 10:    // Manual movement of the arm, if enabled
+      if(bitRead(Status, manual_mov_enabled))
+      {
+        display_text_2_lines("Manual Movement", "TEST to start");
+        
+        if(bitRead(Buttons1, TST_pressed))
+        {
+          bitSet(Alarms, calibON);
+          telemetry_option = 1;
+          move_arm_with_pot();
+
+          delay(500);
+          exit_menu();
+        }
+      }
+      else
+      {
+        display_text_2_lines("Man Mov Disbld.", "Press TEST");
+
+        if(bitRead(Buttons1, TST_pressed))
+        {
+          delay(100);
+          exit_menu();
+        }
+      }
+
+      break;
+*/
 
     default:
       display_text_2_lines("Exit Menu", "Press TEST");
@@ -983,6 +1006,8 @@ void calculate_wanted_pos_vel()
   wanted_vel_PWM = wanted_vel_PWM*float(cycleTime)/float(wanted_cycle_time);
 
 #if LOGGER == 1
+// En lugar de ir recalculando esto, mejor mandar las teóricas, según el
+// compression_perc actual.
   if(int(wanted_pos) < min_wanted_pos)
     min_wanted_pos = int(wanted_pos);
 
@@ -995,7 +1020,6 @@ void calculate_wanted_pos_vel()
   if(A_pot > max_A_pot)
     max_A_pot = A_pot;
 #endif
-
 }
 
 
@@ -1056,7 +1080,10 @@ void initialize_breath()
 void start_new_cycle()
 {
   index = 0;
-  cycle_number += 1;
+
+  if(cycle_number < 255)    // Revisar si realmente llega hasta este valor.
+    cycle_number += 1;
+
   start_wait = millis();
   bitClear(Alarms, in_wait);
   bitSet(Status, send_beep);
@@ -1073,6 +1100,7 @@ void start_new_cycle()
     Serial.println(max_A_pot);
     Serial.println(prev_min_pressure);
     Serial.println(prev_max_pressure);
+    Serial.println(int(BPM));
 
     // Reset values for next cycle (reseting the pressure vals is done somewhere else)
     min_wanted_pos = 1023;
@@ -1274,10 +1302,21 @@ void calibrate_arm_range()   // used for calibaration of motion range
   while(bitRead(Status, progress) == 0)
     internal_arm_calib_step();  // step 3 - manual control for positioning back in safe location 
 
+#if LCD_available == 1
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Arm Calibrated");
+  lcd.setCursor(0, 1);
+  lcd.print("U: ");
+  lcd.print(min_arm_pos);
+  lcd.print(", L: ");
+  lcd.print(max_arm_pos);
+#endif
+
   EEPROM.put(4, min_arm_pos);
   delay(200);
   EEPROM.put(8, max_arm_pos);
-  delay(200);
+  delay(2000);
 
   bitSet(Status, calibrated);
 }
@@ -1318,7 +1357,6 @@ void internal_arm_calib_step()
 void calibrate_pot_range()   // used for calibaration of potentiometers
 { 
   LED_USR(1);
-//  calibON = 2;  // NO ES NECESARIO, NO SE REVISA ANTES DE CLEAREARLA
 
   read_IO();
   display_text_calib("Pot to left pos");
@@ -1340,6 +1378,9 @@ void calibrate_pot_range()   // used for calibaration of potentiometers
   rate_pot_high = analogRead(pin_FRQ);
   pres_pot_high = analogRead(pin_PRE);
 
+  delay(DELTA_LCD_REFRESH);
+  display_text_2_lines("Potentiometers", "Calibrated");
+
   EEPROM.put(12, comp_pot_low);   delay(200);
   EEPROM.put(16, comp_pot_high);  delay(200);
   EEPROM.put(20, rate_pot_low);   delay(200);
@@ -1348,12 +1389,14 @@ void calibrate_pot_range()   // used for calibaration of potentiometers
   EEPROM.put(32, pres_pot_high);  delay(200);
 }
 
+// MEJOR QUITO LO SIGUIENTE, PORQUE LA MEMORIA ESTÁ LLEGANDO AL TOPE, CAUSANDO
+// PROBLEMAS DE INESTABILIDAD (RESETEO DEL ARDUINO)
 // This function allows to move the arm with the amplitude potentiometer
+/*
 void move_arm_with_pot()
 {
   read_IO();
 
-//  display_text_2_lines("Manual Movement", "TEST to stop");
 #if LCD_available == 1
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -1377,13 +1420,13 @@ void move_arm_with_pot()
       {
         last_sent_data = millis();  // last time telemetry was displayed
 
-//        if(telemetry == 1)
         if(telemetry == 1 && LOGGER == 0)
           print_tele();
       }
     }
   }
 }
+
 
 void set_pos_vel_with_pot()
 {
@@ -1414,11 +1457,10 @@ void set_pos_vel_with_pot()
   if(invert_mot)
     wanted_manual_vel_PWM = -wanted_manual_vel_PWM;
 
-  if(curr_sense)
-  {
-    if(A_current > max_allowed_current)
-      wanted_manual_vel_PWM = 0;
-  }
+#if curr_sense == 1
+  if(A_current > max_allowed_current)
+    wanted_manual_vel_PWM = 0;
+#endif
 
   if(wanted_manual_vel_PWM > PWM_max)
     wanted_manual_vel_PWM = PWM_max;  // limit PWM
@@ -1443,14 +1485,14 @@ void set_pos_vel_with_pot()
     digitalWrite(pin_INB, LOW);
   }
 
-  motorPWM = (int)(wanted_manual_vel_PWM*255.0/PWM_max);  // set between 0 and 255
+  motorPWM = (byte)(wanted_manual_vel_PWM*255.0/PWM_max);  // set between 0 and 255
 
   if(motorPWM < PWM_THR)
     motorPWM = 0;
   
   analogWrite(pin_PWM, motorPWM);
 }
-
+*/
 
 #if LCD_available == 1
 void display_LCD()  // here function that sends data to LCD
@@ -1508,19 +1550,13 @@ void set_motor_PWM(float wanted_vel_PWM)
   if(abs(A_pot - prev_A_pot) > 0 || abs(wanted_vel_PWM) < 15)
     index_last_motion = index;
 
-/*
-  if(bitRead(Alarms, calibON) == 1)
-    wanted_vel_PWM = read_motion_for_calib();  // allows manual motion during calibration
-*/
-
   if(invert_mot)
     wanted_vel_PWM = -wanted_vel_PWM;
 
-  if(curr_sense)
-  {
-    if(A_current > max_allowed_current)
-      wanted_vel_PWM = 0;
-  }
+#if curr_sense == 1
+  if(A_current > max_allowed_current)
+    wanted_vel_PWM = 0;
+#endif
 
   if(bitRead(Alarms, motion_failure) == 1 && bitRead(Alarms, calibON) == 0)
     wanted_vel_PWM = 0;
@@ -1554,34 +1590,10 @@ void set_motor_PWM(float wanted_vel_PWM)
     digitalWrite(pin_INB, LOW);
   }
 
-  motorPWM = (int)(wanted_vel_PWM*255.0/PWM_max);  // set between 0 and 255
+  motorPWM = (byte)(wanted_vel_PWM*255.0/PWM_max);  // set between 0 and 255
   analogWrite(pin_PWM, motorPWM);
 }
 
-// REVISAR SI REALMENTE USAMOS ESTA FUNCIÓN (ESTA OPCIÓN)
-/*
-int read_motion_for_calib()
-{
-  int wanted_cal_PWM;
-
-  if(pot_rate > 750)
-    wanted_cal_PWM = (pot_rate - 750)/15;
-
-  if(pot_rate < 250)
-    wanted_cal_PWM = (pot_rate - 250)/15;
-
-  if(pot_rate >= 250 && pot_rate <= 750)
-    wanted_cal_PWM = 0;
-
-  if(bitRead(Buttons1, SW2) == 1)
-    wanted_cal_PWM = -12;
-
-//  if (bitRead(Buttons2, RST)==1) wanted_cal_PWM= 12;
-//    Serial.println(wanted_cal_PWM);
-
-  return(wanted_cal_PWM);
-}
-*/
 
 void store_prev_values()
 {
@@ -1616,7 +1628,6 @@ void align_PID_pots()
 
     if(millis() - last_sent_data > DELTA_TELE_MONITOR)
     { 
-//      if(telemetry == 1)
       if(telemetry == 1 && LOGGER == 0)
         print_tele();
 
@@ -1650,7 +1661,6 @@ void align_PID_pots()
 
     if(millis() - last_sent_data > DELTA_TELE_MONITOR)
     { 
-//      if(telemetry == 1)
       if(telemetry == 1 && LOGGER == 0)
         print_tele();
 
@@ -1684,7 +1694,6 @@ void align_PID_pots()
 
     if(millis() - last_sent_data > DELTA_TELE_MONITOR)
     {
-//      if(telemetry == 1)
       if(telemetry == 1 && LOGGER == 0)
         print_tele();
 
@@ -1724,7 +1733,6 @@ void set_PID_constants()
                    rate_pot_low)/(1.0*(rate_pot_high - rate_pot_low)) + KP_MIN;
   KP = constrain(KP, KP_MIN, KP_MAX);
 
-  // Tiene que ser pin_PRE, pero no estaba funcionando. Para mientras, uso el pin_POT
   KI = (KI_MAX - KI_MIN)*1.0*(analogRead(pin_PRE) - 
                    pres_pot_low)/(1.0*(pres_pot_high - pres_pot_low)) + KI_MIN;
   KI = constrain(KI, KI_MIN, KI_MAX);
@@ -1773,7 +1781,6 @@ void adj_v_module()
 
       if(millis() - last_sent_data > DELTA_TELE_MONITOR)
       {
-//        if(telemetry == 1)
         if(telemetry == 1 && LOGGER == 0)
           print_tele();
 
@@ -1794,6 +1801,9 @@ void adj_v_module()
 
   if(bitRead(Status, save_cancelled) == 0)
   {
+    delay(DELTA_LCD_REFRESH);
+    display_text_2_lines("Ctrl. Calibr.", "Completed");
+
   // Save adjustment vector values to the EEPROM
     for(i = 0; i < N_adj; i++)
     {
@@ -1803,7 +1813,7 @@ void adj_v_module()
   }
   else  // if the process was cancelled
   {
-    delay(100);
+    delay(DELTA_LCD_REFRESH);
     display_text_2_lines("Adj_v Calib.", "Cancelled");
 
     // Put the former values back
@@ -2042,7 +2052,9 @@ void read_IO()
   else
     A_pot = analogRead(pin_POT);
 
+#if curr_sense == 1
 //  A_current = analogRead(pin_CUR)/8;  // in tenth Amps
+#endif
 
   // When adjusting PID values, or adj_v values, don't use pot values
   // to adjust BPM, Compression_perc and insp_pressure.
@@ -2071,9 +2083,9 @@ void read_IO()
     A_comp = range_pot(int(pot_comp), comp_pot_low, comp_pot_high);
     A_pres = range_pot(int(pot_pres), pres_pot_low, pres_pot_high);
   }
-  else  // Adjusting PID parameters
+  else  // Adjusting Controller parameters
   {
-    A_rate = 800;  // BPM approx. 20
+    A_rate = 600;  // BPM approx. 20 (800 if BPM range is 6-24, 600 if range is 6-30)
     A_comp = 615;  // Compression_perc approx. 90
     A_pres = 500;  // insp_pressure = 50
   }
@@ -2084,8 +2096,9 @@ void read_IO()
     Compression_perc = constrain(Compression_perc, perc_of_lower_vol_display, 100);
   }
 
-  BPM = 6 + (A_rate - 23)/55;       // 0 is 6 breaths per minute, 1023 is 24 BPM
-  breath_cycle_time = 60000/BPM + 100;  // in milisec
+//  BPM = 6 + (A_rate - 23)/55;       // 0 is 6 breaths per minute, 1023 is 24 BPM
+  BPM = round(6.0 + 24.0*A_rate/1023);       // 0 is 6 breaths per minute, 1023 is 30 BPM
+  breath_cycle_time = 60000/BPM + 100;  // in milisec. ¿POR QUÉ ESE OFFSET DE 100?
 
   insp_pressure = 30 + A_pres/25;          // 0 is 30 mBar, 1023 is 70 mBar
   insp_pressure = constrain(insp_pressure, 30, 70);
@@ -2134,7 +2147,7 @@ void read_IO()
     wanted_cycle_time = breath_cycle_time/profile_length;  // máximo es 40.4
 
   if(wanted_cycle_time < cycleTime)
-    wanted_cycle_time = cycleTime;  // 10
+    wanted_cycle_time = cycleTime;  // 8 ó 10, según se haya definido
 
 // Conditions for buzzing: pressure failure,
   if(failure == 2)
@@ -2142,42 +2155,6 @@ void read_IO()
   else
     Buzzer(0);
 }
-
-/*
-void send_data_to_monitor()
-{
-  if(monitor_index == 0)
-    Serial.println("A");
-
-  if(monitor_index == 1)
-    Serial.println(byte(BPM));
-
-  if(monitor_index == 2)
-    Serial.println(byte(Compression_perc));
-
-  if(monitor_index == 3)
-    Serial.println(byte(pressure_abs));
-
-  if(monitor_index == 4)
-    Serial.println(byte(failure));
-
-  if(monitor_index == 5)
-  {
-    if(bitRead(Status, send_beep))
-    {
-      Serial.println(byte(1));
-      bitClear(Status, send_beep);
-    }
-    else
-      Serial.println(byte(0));
-  }
-
-  if(monitor_index == 6)
-    Serial.println(byte(insp_pressure));
-
-  monitor_index = (monitor_index + 1) % 7;
-}
-*/
 
 void LED_FAIL(byte val)
 {
@@ -2262,7 +2239,10 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.println("");
   }
 
+// MEJOR QUITO LO SIGUIENTE, PORQUE LA MEMORIA ESTÁ LLEGANDO AL TOPE, CAUSANDO
+// PROBLEMAS DE INESTABILIDAD (RESETEO DEL ARDUINO)
 // Manual Movement
+/*
   if(telemetry_option == 1)
   {
     Serial.print("Feedback: ");          Serial.print(A_pot);
@@ -2271,6 +2251,7 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.print(", wanted_manual_vel_PWM: ");  Serial.print(wanted_manual_vel_PWM);
     Serial.print(", motorPWM: ");        Serial.println(motorPWM);
   }
+*/
 
 // PID Calibration
   if(telemetry_option == 2)
