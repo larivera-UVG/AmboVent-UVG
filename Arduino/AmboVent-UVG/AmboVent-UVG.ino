@@ -1826,11 +1826,10 @@ void adj_v_module()
 
 // Function that reads the AMP potentiometer value and changes
 // the current adj_v accordingly.
-// Variables i and Compression_perc are being changed in 
+// Variables i and Compression_perc are being changed in adj_v_module()
 void set_adj_v_values()
 {
   adj_v[i] = map(analogRead(pin_AMP), comp_pot_low, comp_pot_high, ADJ_V_MIN, ADJ_V_MAX);
-          
   adj_v[i] = constrain(adj_v[i], ADJ_V_MIN, ADJ_V_MAX);
 
   if(millis() - lastUSRblink > DELTA_LCD_REFRESH)

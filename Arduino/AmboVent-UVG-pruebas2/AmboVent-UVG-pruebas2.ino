@@ -3,7 +3,7 @@
  Based on the original code for the AmboVent (April 12, 2020)
 
  CÓDIGO PARA PROBAR MÓDULOS/FUNCIONES QUE SE VAYAN AGREGANDO
-
+ PARA PRUEBAS EN EL SEGUNDO PROTOTIPO
 ***************** Key modifications *******************************************
  Pressure sensor: This version uses an Adafruit MPRLS pressure sensor (hPa),
  instead of the SparkFun MS5803 sensor (mbar).
@@ -15,7 +15,7 @@
 */
 
 /*
- *  THIS CODE WAS WRITTEN FOR USE IN A HOME MADE VENTILATION DEVICE. 
+ *  THIS CODE WAS WRITTEN FOR USE IN A HOME MADE VENTILATION DEVICE.
  *  IT IS NOT TESTED FOR SAFETY AND NOT RECOMENDED FOR USE IN ANY COMERCIAL DEVICE.
  *  IT IS NOT APPROVED BY ANY REGULAOTRY AUTHORITY
  *  USE ONLY AT YOUR OWN RISK.
@@ -35,13 +35,12 @@
 
 // system configuration
 #define pressure_sensor_available 1 // 1 - you have installed an I2C pressure sensor 
-#define curr_sense 0
 #define central_monitor_system 0    // 1 - send unique ID for 10 seconds upon startup, 0 - dont
 
 // options for display, debug and logging data via serial com
 //#define send_to_monitor 1     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemetry for debugging
-#define LOGGER 1  // 1 - send log data. This will disable the telemetry, even if telemetry == 1
+#define LOGGER 0  // 1 - send log data. This will disable the telemetry, even if telemetry == 1
 #define DELTA_TELE_MONITOR 250  // Delta time (in ms) for displaying telemetry and info to monitor
 #define DELTA_LCD_REFRESH  150
 
@@ -67,41 +66,37 @@
 
 #define LCD_available 1 
 #define pres_pot_available 1  // 1 if the system has 3 potentiometer and can control the inspirium pressure 
-#define pin_TST 4         // test mode - not in use
-#define pin_SW2 5         // breath - On / Off / cal
-#define pin_RST 6         // reset alarm
-#define pin_LED_USR  7    // User LED
-#define pin_LED_FAIL 8    // FAIL and calib: red LED
 
-// !! REVISAR EL PIN QUE SE USARÁ
-#define pin_BUZZER 9
+#define pin_TST 4           // test
+#define pin_SW2 5           // breath - On / Off / cal
+#define pin_RST 6           // reset
+#define pin_LED_USR 7       // User LED
+#define pin_BUZZER A0
 
-// For Electrovalves !! CAMBIAR A LOS PINES QUE SE USARÁN
-#define pin_EVALV1 10       // Electrovalve 1
+#define pin_EVALV1  9       // Electrovalve 1
 #define pin_EVALV2 10       // Electrovalve 2
-#define pin_EVALV1_STAT 13  // Electrovalve 1 satus
+#define pin_EVALV1_STAT  8  // Electrovalve 1 status
 #define pin_EVALV2_STAT 13  // Electrovalve 2 status
-
 
 #define MIN_ARM_POS_DEF 150
 #define MAX_ARM_POS_DEF 550
 
 #define FF_MIN 0.05
 #define FF_MAX 3
-#define FF_DEF 1              // motion control feed forward. 0.6, 4.5
+#define FF_DEF 1            // motion control feed forward. 0.6, 4.5
 #define DELTA_FF ((FF_MAX-FF_MIN)/100.0)
 
 #define KP_MIN 0.05
 #define KP_MAX 1.5
-#define KP_DEF 0.2              // motion control propportional gain 0.2, 1.2
+#define KP_DEF 0.2          // motion control propportional gain 0.2, 1.2
 #define DELTA_KP ((KP_MAX-KP_MIN)/100.0)
 
 #define KI_MIN 0.1
 #define KI_MAX 7
-#define KI_DEF 3                // motion control integral gain 2, 7
+#define KI_DEF 3            // motion control integral gain 2, 7
 #define DELTA_KI ((KI_MAX-KI_MIN)/100.0)
 
-#define ADJ_V_MIN  10  // 0.5
+#define ADJ_V_MIN  10  // 0.1
 #define ADJ_V_MAX 200  // 2.0
 
 #define integral_limit 10        // limits the integral of error. Original: 5
@@ -110,18 +105,17 @@
 // Other Arduino pins alocation
 // Pins for Motor Driver
 #define pin_PWM  3    // digital pin that sends the PWM to the motor
-#define pin_INA 12    // Para el driver
-#define pin_INB 11    // Para el driver
+#define pin_INA 11    // Para el driver
+#define pin_INB 12    // Para el driver
 
-#define pin_POT A0   // analog pin of motion feedback potentiometer
-#define pin_AMP A1   // analog pin of amplitude potentiometer control
-#define pin_FRQ A2   // analog pin of rate potentiometer control
-#define pin_PRE A3   // analog pin of pressure potentiometer control
-//#define pin_CUR 6    // analog pin of current sense
+#define pin_POT  A6   // analog pin of motion feedback potentiometer (motor)
+#define pin_POT2 A7   // analog pin of motion feedback potentiometer (arm)
+#define pin_AMP  A1   // analog pin of amplitude potentiometer control
+#define pin_FRQ  A2   // analog pin of rate potentiometer control
+#define pin_PRE  A3   // analog pin of pressure potentiometer control
 
 // Pins for factory reset and configuration switches
-#define pin_FRESET  2   // VERIFICAR ESTOS PINES
-#define pin_CONFIG 13   // VERIFICAR ESTOS PINES
+#define pin_CONFIG  2   // VERIFICAR ESTOS PINES
 
 // Talon SR or SPARK controller PWM settings ("angle" for Servo library)
 #define PWM_mid 93  // mid value for PWM 0 motion - higher pushes up
@@ -241,7 +235,6 @@ byte Buttons2;
 
 
 byte menu_state;
-// byte monitor_index = 0, 
 byte BPM = 14, prev_BPM, failure, wanted_cycle_time;
 
 // For the detection of push buttons
@@ -256,7 +249,7 @@ byte insp_pressure, prev_insp_pressure, safety_pressure_counter, no_fail_counter
 byte motorPWM, index = 0, prev_index, i, cycle_number, cycles_lost,
      index_last_motion;
 
-int A_pot, prev_A_pot, A_rate, A_comp, A_pres; // A_current
+int A_pot, prev_A_pot, A_rate, A_comp, A_pres;
 int wait_cycles, pos_from_pot;
 
 int pressure_abs, breath_cycle_time, max_pressure = 0, prev_max_pressure = 0,
@@ -301,15 +294,10 @@ void setup()
   pinMode(pin_RST, INPUT_PULLUP);
 
   pinMode(pin_CONFIG, INPUT_PULLUP);
-  pinMode(pin_FRESET, INPUT_PULLUP);
 
-//  pinMode(pin_LED_AMP, OUTPUT);
-//  pinMode(pin_LED_FREQ, OUTPUT);
-  pinMode(pin_LED_FAIL, OUTPUT);
   pinMode(pin_LED_USR, OUTPUT);
   pinMode(pin_BUZZER, OUTPUT);
 
-// For Electrovalves !! CAMBIAR A LOS PINES QUE SE USARÁN
   pinMode(pin_EVALV1, OUTPUT);
   pinMode(pin_EVALV1_STAT, INPUT_PULLUP);
   pinMode(pin_EVALV2, OUTPUT);
@@ -386,7 +374,6 @@ void setup()
   bitClear(Alarms, motion_failure);
   bitClear(Alarms, high_pressure_detected);
   bitClear(Alarms, calibON);
-  bitClear(Status, manual_mov_enabled);  // Will be updated at the first read_IO
   bitClear(Status, CONFIG_enabled);      // Will be updated at the first read_IO
   bitClear(Status, save_cancelled);
 
@@ -487,7 +474,7 @@ void display_menu()
     case 1:     // move arm down once
       if(bitRead(Status, progress) == 0)
       {
-        display_text_2_lines("Press TEST to", "run one breath  ");
+        display_text_2_lines("Press TEST to", "run one breath");
 
         if(bitRead(Buttons1, TST_pressed)) 
         {
@@ -559,7 +546,7 @@ void display_menu()
 
 
     case 5:     // set motion profile total time
-      display_text_2_lines("Set Motion Time", "TEST to start ");
+      display_text_2_lines("Set Motion Time", "TEST to start");
 
       if(bitRead(Buttons1, TST_pressed))
       {
@@ -636,7 +623,7 @@ void display_menu()
 
         if(bitRead(Buttons1, TST_pressed))
         {
-          telemetry_option = 2;
+          telemetry_option = 1;
           bitSet(Alarms, calibON);
 
 // Primero colocar los pots en la posición correspondiente a las
@@ -720,7 +707,7 @@ void display_menu()
 
         if(bitRead(Buttons1, TST_pressed))
         {
-          telemetry_option = 3;
+          telemetry_option = 2;
           adjusting_params = 2;
           bitSet(Alarms, calibON);
           bitClear(Status, save_cancelled);
@@ -783,37 +770,6 @@ void display_menu()
 
       break;
 
-// MEJOR QUITO LO SIGUIENTE, PORQUE LA MEMORIA ESTÁ LLEGANDO AL TOPE, CAUSANDO
-// PROBLEMAS DE INESTABILIDAD (RESETEO DEL ARDUINO)
-/*
-    case 10:    // Manual movement of the arm, if enabled
-      if(bitRead(Status, manual_mov_enabled))
-      {
-        display_text_2_lines("Manual Movement", "TEST to start");
-        
-        if(bitRead(Buttons1, TST_pressed))
-        {
-          bitSet(Alarms, calibON);
-          telemetry_option = 1;
-          move_arm_with_pot();
-
-          delay(500);
-          exit_menu();
-        }
-      }
-      else
-      {
-        display_text_2_lines("Man Mov Disbld.", "Press TEST");
-
-        if(bitRead(Buttons1, TST_pressed))
-        {
-          delay(100);
-          exit_menu();
-        }
-      }
-
-      break;
-*/
 
     default:
       display_text_2_lines("Exit Menu", "Press TEST");
@@ -922,7 +878,6 @@ void run_profile_func()
 void calculate_wanted_pos_vel()
 {
   byte pos_from_profile, vel_from_profile;
-//  float adj_val;
 
   pos_from_profile = pgm_read_byte_near(pos + index);
   vel_from_profile = pgm_read_byte_near(vel + index + 1);
@@ -995,26 +950,21 @@ void calculate_wanted_pos_vel()
     integral = 0;  // zero the integral accumulator at the beginning of cycle and movement up
 
   if(planned_vel < 0)
-  {
     f_reduction_up = f_reduction_up_val;
-//    error = 0.5*error;
-  }
   else
     f_reduction_up = 1;  // reduce f for the movement up
  
-  // PID correction 
+  // Controller correction
   wanted_vel_PWM = FF*planned_vel*f_reduction_up + KP*error + KI*integral;
 
   // reduce speed for longer cycles
   wanted_vel_PWM = wanted_vel_PWM*float(cycleTime)/float(wanted_cycle_time);
 
-  //if(index > int(0.8*profile_length) && abs(wanted_vel_PWM) < 15)
+  // To help prevent the arm from going beyond the min wanted position
   if(index > int(0.6*profile_length) && A_pot < (min_arm_pos + int(0.02*range)))
     wanted_vel_PWM = 0;
 
 #if LOGGER == 1
-// En lugar de ir recalculando esto, mejor mandar las teóricas, según el
-// compression_perc actual.
   if(int(wanted_pos) < min_wanted_pos)
     min_wanted_pos = int(wanted_pos);
 
@@ -1028,7 +978,6 @@ void calculate_wanted_pos_vel()
     max_A_pot = A_pot;
 #endif
 }
-
 
 void standby_func()  // not running profile
 {
@@ -1224,10 +1173,10 @@ void calc_failure()
   {
     no_fail_counter = 0;
   }
-  else
-  {
-    LED_FAIL(0);
-  }
+//  else
+//  {
+//    LED_FAIL(0);
+//  }
 
   if(no_fail_counter >= 3)
     safety_pressure_counter = 0;
@@ -1396,111 +1345,6 @@ void calibrate_pot_range()   // used for calibaration of potentiometers
   EEPROM.put(32, pres_pot_high);  delay(200);
 }
 
-// MEJOR QUITO LO SIGUIENTE, PORQUE LA MEMORIA ESTÁ LLEGANDO AL TOPE, CAUSANDO
-// PROBLEMAS DE INESTABILIDAD (RESETEO DEL ARDUINO)
-// This function allows to move the arm with the amplitude potentiometer
-/*
-void move_arm_with_pot()
-{
-  read_IO();
-
-#if LCD_available == 1
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Manual Movement");
-  lcd.setCursor(0, 1);
-  lcd.print("TEST to stop");
-#endif
-  delay(100);
-
-  while(bitRead(Buttons1, TST_pressed) == 0)
-  {
-    read_IO();    // Read status of User Interface
-  
-    if(millis() - lastIndex >= wanted_cycle_time)  // wait for the cycle time
-    {
-      lastIndex = millis();  // last start of cycle time
-
-      set_pos_vel_with_pot();
-
-      if(millis() - last_sent_data >= DELTA_TELE_MONITOR)  // esperar para mostrar telemetry
-      {
-        last_sent_data = millis();  // last time telemetry was displayed
-
-        if(telemetry == 1 && LOGGER == 0)
-          print_tele();
-      }
-    }
-  }
-}
-
-
-void set_pos_vel_with_pot()
-{
-  int pot_temp = analogRead(pin_AMP);
-  pot_temp = constrain(pot_temp, comp_pot_low, comp_pot_high);
-
-  pos_from_pot = map(pot_temp, comp_pot_low, comp_pot_high, min_arm_pos, max_arm_pos);
-
-  wanted_pos = float(pos_from_pot);
-
-  prev_error = error;
-  error = wanted_pos - float(A_pot);
-
-  integral = error*float(wanted_cycle_time)/1000;
-
-  if(integral > integral_limit)
-    integral = integral_limit;
-
-  if(integral < -integral_limit)
-    integral = -integral_limit;
-
-  // PI correction 
-  wanted_manual_vel_PWM = KP*error + KI*integral;
-
-  // reduce speed for longer cycles
-  wanted_manual_vel_PWM = wanted_manual_vel_PWM*float(cycleTime)/float(wanted_cycle_time);
-
-  if(invert_mot)
-    wanted_manual_vel_PWM = -wanted_manual_vel_PWM;
-
-#if curr_sense == 1
-  if(A_current > max_allowed_current)
-    wanted_manual_vel_PWM = 0;
-#endif
-
-  if(wanted_manual_vel_PWM > PWM_max)
-    wanted_manual_vel_PWM = PWM_max;  // limit PWM
-
-  if(wanted_manual_vel_PWM < PWM_min)
-    wanted_manual_vel_PWM = PWM_min;  // limit PWM
-
-// Set PWM through the REV Robotics SPARK Motor driver. Values between 0 and 180 ---
-//  motorPWM = PWM_mid + int(wanted_manual_vel_PWM);
-//  motor.write(motorPWM);
-
-// Set PWM through the VNH5019A-E driver. Values between 0 and 255 ---
-  if(wanted_manual_vel_PWM < 0)
-  {
-    digitalWrite(pin_INA, LOW);
-    digitalWrite(pin_INB, HIGH);
-    wanted_manual_vel_PWM = -wanted_manual_vel_PWM;
-  }
-  else
-  {
-    digitalWrite(pin_INA, HIGH);
-    digitalWrite(pin_INB, LOW);
-  }
-
-  motorPWM = (byte)(wanted_manual_vel_PWM*255.0/PWM_max);  // set between 0 and 255
-
-  if(motorPWM < PWM_THR)
-    motorPWM = 0;
-  
-  analogWrite(pin_PWM, motorPWM);
-}
-*/
-
 #if LCD_available == 1
 void display_LCD()  // here function that sends data to LCD
 {
@@ -1560,11 +1404,6 @@ void set_motor_PWM(float wanted_vel_PWM)
   if(invert_mot)
     wanted_vel_PWM = -wanted_vel_PWM;
 
-#if curr_sense == 1
-  if(A_current > max_allowed_current)
-    wanted_vel_PWM = 0;
-#endif
-
   if(bitRead(Alarms, motion_failure) == 1 && bitRead(Alarms, calibON) == 0)
     wanted_vel_PWM = 0;
 
@@ -1600,7 +1439,6 @@ void set_motor_PWM(float wanted_vel_PWM)
   motorPWM = (byte)(wanted_vel_PWM*255.0/PWM_max);  // set between 0 and 255
   analogWrite(pin_PWM, motorPWM);
 }
-
 
 void store_prev_values()
 {
@@ -1768,7 +1606,6 @@ void adj_v_module()
 
   for(i = 0; i < N_adj; i++)
   {
-//    Compression_perc = (int)(Compression_perc_v[i]);
     Compression_perc = (byte)(pgm_read_byte_near(Comp_perc_v + i));
 
     read_IO();
@@ -1945,12 +1782,8 @@ void read_IO()
 {
   store_prev_values();
 
-// Check Configuration switch to see if manual movement and Config (calibration)
-// is enabled.
-//  bitWrite(Status, manual_mov_enabled, digitalRead(pin_CONFIG));
-  bitSet(Status, manual_mov_enabled);  // TEMPORAL
-//  bitWrite(Status, CONFIG_enabled, digitalRead(pin_CONFIG));
-  bitSet(Status, CONFIG_enabled);    // TEMPORAL
+// Check Configuration switch to see if Config (calibration) is enabled.
+  bitWrite(Status, CONFIG_enabled, digitalRead(pin_CONFIG));
 
   bitWrite(Buttons1, SW2temp, 1 - digitalRead(pin_SW2));
   bitWrite(Buttons1, TSTtemp, 1 - digitalRead(pin_TST));
@@ -2058,13 +1891,9 @@ void read_IO()
   else
     A_pot = analogRead(pin_POT);
 
-#if curr_sense == 1
-//  A_current = analogRead(pin_CUR)/8;  // in tenth Amps
-#endif
-
-  // When adjusting PID values, or adj_v values, don't use pot values
+  // When adjusting Controller values, or adj_v values, don't use pot values
   // to adjust BPM, Compression_perc and insp_pressure.
-  if(adjusting_params != 1)  // NO PID adjustment being done
+  if(adjusting_params != 1)  // NO controller adjustment being done
   {
     A_rate = analogRead(pin_FRQ);
     A_comp = analogRead(pin_AMP);
@@ -2130,7 +1959,7 @@ void read_IO()
   if(range_factor < 0)
     range_factor = 0;
 
-#if(pressure_sensor_available==1)
+#if pressure_sensor_available == 1
   if(millis() - last_read_pres > 100)
   {
     last_read_pres = millis();
@@ -2160,14 +1989,6 @@ void read_IO()
     Buzzer(1);
   else
     Buzzer(0);
-}
-
-void LED_FAIL(byte val)
-{
-  if(INVERT_LEDS)
-    digitalWrite(pin_LED_FAIL, 1 - val);
-  else
-    digitalWrite(pin_LED_FAIL, val);
 }
 
 void LED_USR(byte val)
@@ -2212,9 +2033,6 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     // Serial.print(", w cyc t:");          Serial.print(wanted_cycle_time);
     // Serial.println("");
 
-    // Serial.print(" cur:");
-    // Serial.print(A_current);
-
     Serial.print("Curr. Press.: ");      Serial.print(adafruitPress.readPressure());
     Serial.print(", P. baseline: ");     Serial.print(pressure_baseline);
     Serial.print(", pressure_abs: ");    Serial.print(pressure_abs);
@@ -2245,22 +2063,8 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
     Serial.println("");
   }
 
-// MEJOR QUITO LO SIGUIENTE, PORQUE LA MEMORIA ESTÁ LLEGANDO AL TOPE, CAUSANDO
-// PROBLEMAS DE INESTABILIDAD (RESETEO DEL ARDUINO)
-// Manual Movement
-/*
+// Controller Calibration
   if(telemetry_option == 1)
-  {
-    Serial.print("Feedback: ");          Serial.print(A_pot);
-    Serial.print(", pos_from_pot: ");    Serial.print(pos_from_pot);
-    Serial.print(", error: ");           Serial.print(error);
-    Serial.print(", wanted_manual_vel_PWM: ");  Serial.print(wanted_manual_vel_PWM);
-    Serial.print(", motorPWM: ");        Serial.println(motorPWM);
-  }
-*/
-
-// PID Calibration
-  if(telemetry_option == 2)
   {
     Serial.print("Current FF: ");        Serial.print(FF);
     Serial.print(", FF_temp: ");         Serial.println(FF_temp);
@@ -2271,7 +2075,7 @@ void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
   }
 
 // Adjustment_vector Calibration
-  if(telemetry_option == 3)
+  if(telemetry_option == 2)
   {
     Serial.print("i: ");                   Serial.print(i);
     Serial.print(", Compression_perc: ");  Serial.print(Compression_perc);

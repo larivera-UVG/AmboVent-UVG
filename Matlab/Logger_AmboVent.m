@@ -5,10 +5,10 @@
 clc;
 pause(0.1);
 
-BPM = 20;      % Ciclos por minuto. Hacer coincidir con el programa de Arduino.
+BPM = 20;  % Ciclos por minuto. Hacer coincidir con el programa de Arduino.
+           % Si esto cambia en el ventilador, el tiempo total no necesariamente va a
+           % coincidir.
 
-% CAMBIAR: QUE NO SE NECESITE FIJAR EL COMP_PER. QUE EL PROGRAMA DEL ARDUINO MANDE LOS
-% MÁXIMOS Y MÍNIMOS TEÓRICOS DEL WANTED_POS, SEGÚN SEAN EL COMPRESSION_PER.
 Comp_per = 80; % Porcentaje de compresión. Hacer coincidir con el programa de Arduino.
 T_total = 5/60;  % Tiempo, en horas
 N = ceil(T_total*60*BPM);   % número de muestras
@@ -31,17 +31,14 @@ end
 % Tiempos medidos ------------------------------------------------------------------------
 figure(1); clf;
 h11 = animatedline('Color','b');
-% h11 = plot(2:N, (60/BPM)*ones(1,N-1), 'b');
 hold on;
 h12 = animatedline('Color','r');
 xlabel('número de ciclo');
 ylabel('tiempo (seg)');
 xlim([0, N]);
-% ylim([60/BPM-1,60/BPM+1]);
-ylim([1, 11]);
+ylim([1, 12]);
 legend('Teórico', 'Medido');
-% title(sprintf('Tiempos entre mediciones. Teórico: %0.2f', 60/BPM));
-title('Tiempos entre mediciones');
+title('Duración de los Ciclos');
 grid on;
 
 % Posiciones calculadas y medidas del potenciómetro de feedback --------------------------
@@ -52,10 +49,10 @@ h22 = animatedline('Color','m');
 h23 = animatedline('Color','b');
 h24 = animatedline('Color','c');
 xlabel('número de ciclo');
-ylabel('posiciones');
+ylabel('Valor ADC');
 xlim([0, N]);
-title(sprintf('wanted-pos y A-pot. Comp-per: %d', Comp_per));
-legend('max-wanted-pos', 'max-A-pot', 'min-wanted-pos', 'min-A-pot', 'Location', 'east');
+legend('máx deseada', 'máx medida', 'mín deseada', 'mín medida', 'Location', 'east');
+title('Posiciones Extremas del Brazo');
 grid on;
 
 % Presiones máximas y mínimas medidas ----------------------------------------------------
@@ -67,8 +64,8 @@ xlabel('número de ciclo');
 ylabel('mbar');
 ylim([-1, 30]);
 xlim([0, N]);
-title('Máximos y Mínimos de Presión');
 legend('Máximos', 'Mínimos');
+title('Máximos y Mínimos de Presión');
 grid on;
 
 pause(0.1);
@@ -76,21 +73,28 @@ pause(0.1);
 % Crear objeto serial y abrir el puerto
 % instrreset; % sólo si se tiene el Instrument Control Toolbox
 delete(instrfind);  % Para evitar problemas al abrir y cerrar.
-sObj = serial('COM28','BaudRate',115200);  % REVISAR EL PUERTO
+sObj = serial('COM19','BaudRate',115200);  % REVISAR EL PUERTO
 sObj.Timeout = 30;
 fopen(sObj);
 
+pause(10);  % Para dar tiempo que el Arduino se reinicie.
 fprintf('PRESIONE START...\n\n');
-pause(0.1);
 
 %% Ciclo de recepción de datos
+timer_tS = tic;
+n_prev = 2;
+
 for n = 1:N
-    tic
+    timer_AV = tic;
+    
     for m = 1:M
         datos(n,m) = fscanf(sObj, '%d');
     end
-    tiempo(n) = toc;
-    
+    tiempo(n) = toc(timer_AV);
+
+    % Para pruebas
+%     pause(tiempo(n));
+
     % Guardar cada minuto, por cualquier cosa
     if(mod(n, BPM) == 0)
         save(nombre_archivo, 'datos', 'tiempo', 'BPM', 'T_total', 'N', 'M', 'Comp_per');
@@ -109,6 +113,14 @@ for n = 1:N
         
         addpoints(h31, n, datos(n,6));
         addpoints(h32, n, datos(n,5));
+                
+        if(toc(timer_tS) > 15)  % Esperar a que pase el intervalo mínimo de ThingSpeak
+            datos_tS = [60/mean(datos((n_prev+1):n,7)),mean(tiempo((n_prev+1):n)),...
+                        mean(datos((n_prev+1):n,[2,4,1,3,6,5]),1)];
+            thingSpeakWrite(1071173,datos_tS,'Fields',1:8,'WriteKey','IDPK32NWJQPZNPTO');
+            timer_tS = tic;
+            n_prev = n;
+        end
         
         drawnow limitrate
     end
@@ -158,3 +170,22 @@ fclose(sObj);
 
 % figure(3);
 % ylim([(min([0; datos(2:N,5)])-1), (max([9; datos(2:N,6)])+1)]);
+
+
+%% Pruebas ThingSpeak
+% % Canal de José Antonio
+% % thingSpeakWrite(1070900,[(2:N)', tiempo(2:N)],'Fields',[2,2],'WriteKey','4NCXKCP5CQGVSJJJ');
+% tStamp = datetime('now');
+% thingSpeakWrite(1070900,tiempo(2),'Fields',2,'WriteKey','4NCXKCP5CQGVSJJJ','TimeStamp',tStamp);
+% 
+% % Canal de prueba mío
+% thingSpeakWrite(1071173,'Fields',[1,2,3],'Values',{1,2,3},'WriteKey','IDPK32NWJQPZNPTO');
+% thingSpeakWrite(1071173,tiempo(2),'Fields',1,'WriteKey','IDPK32NWJQPZNPTO');
+% thingSpeakWrite(1071173,[0,4],'Fields',[2,3],'WriteKey','IDPK32NWJQPZNPTO');
+% 
+% 
+% % Parece que el intervalo mínimo entre envíos es de 15 segundos.
+% thingSpeakWrite(1071173,1:8,'Fields',1:8,'WriteKey','IDPK32NWJQPZNPTO');
+% pause(15);
+% thingSpeakWrite(1071173,1:8,'Fields',1:8,'WriteKey','IDPK32NWJQPZNPTO');
+% 
