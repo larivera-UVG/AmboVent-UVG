@@ -1,8 +1,9 @@
 /*
  AmboVent-UVG
  Based on the original code for the AmboVent (April 12, 2020)
+ Modified by Luis Alberto Rivera
 
- Estable al 26 de mayo, antes de probar en la 2da versión de la placa
+ Estable al 26 de mayo del 2020, para la 1ra versión de la PCB.
 
 ***************** Key modifications *******************************************
  Pressure sensor: This version uses an Adafruit MPRLS pressure sensor (hPa),
@@ -39,7 +40,6 @@
 #define central_monitor_system 0    // 1 - send unique ID for 10 seconds upon startup, 0 - dont
 
 // options for display, debug and logging data via serial com
-//#define send_to_monitor 1     // 1 = send data to monitor  0 = dont
 #define telemetry 1           // 1 = send telemetry for debugging
 #define LOGGER 0  // 1 - send log data. This will disable the telemetry, even if telemetry == 1
 #define DELTA_TELE_MONITOR 250  // Delta time (in ms) for displaying telemetry and info to monitor

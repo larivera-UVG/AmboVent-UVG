@@ -1,9 +1,10 @@
 /*
- AmboVent-UVG
+ AmboVent-UVG-2
  Based on the original code for the AmboVent (April 12, 2020)
+ Modified by Luis Alberto Rivera
 
- CÓDIGO PARA PROBAR MÓDULOS/FUNCIONES QUE SE VAYAN AGREGANDO
- PARA PRUEBAS EN EL SEGUNDO PROTOTIPO
+ Estable al 4 de junio del 2020, primera prueba de la 2da versión de la PCB.
+ 
 ***************** Key modifications *******************************************
  Pressure sensor: This version uses an Adafruit MPRLS pressure sensor (hPa),
  instead of the SparkFun MS5803 sensor (mbar).
@@ -108,8 +109,8 @@
 #define pin_INA 11    // Para el driver
 #define pin_INB 12    // Para el driver
 
-#define pin_POT  A6   // analog pin of motion feedback potentiometer (motor)
-#define pin_POT2 A7   // analog pin of motion feedback potentiometer (arm)
+#define pin_POT  A6   // A6 analog pin of motion feedback potentiometer (motor)
+#define pin_POT2 A7   // A7 analog pin of motion feedback potentiometer (arm)
 #define pin_AMP  A1   // analog pin of amplitude potentiometer control
 #define pin_FRQ  A2   // analog pin of rate potentiometer control
 #define pin_PRE  A3   // analog pin of pressure potentiometer control
@@ -363,7 +364,7 @@ void setup()
     EEPROM.get(36 + 3*sizeof(float) + i*sizeof(byte), adj_v[i]);
     delay(20);
 
-    if(adj_v[i] <= 0 || adj_v[i] > 255 || isnan(adj_v[i]))
+    if(adj_v[i] <= 0 || adj_v[i] > 200 || isnan(adj_v[i]))
       adj_v[i] = 100;
   }
 
@@ -421,7 +422,8 @@ void loop()
         state = MENU_STATE;
       }
 
-      if(bitRead(Alarms, motion_failure) == 1 && bitRead(Buttons2, RST_pressed) == 1)
+      if((bitRead(Alarms, motion_failure) == 1 || bitRead(Alarms, disconnected) == 1 || 
+          bitRead(Alarms, high_pressure_detected) == 1)  && bitRead(Buttons2, RST_pressed) == 1)
       {
         reset_failures();
 #if LCD_available == 1
@@ -1985,7 +1987,7 @@ void read_IO()
     wanted_cycle_time = cycleTime;  // 8 ó 10, según se haya definido
 
 // Conditions for buzzing: pressure failure,
-  if(failure == 2)
+  if(failure == 1)
     Buzzer(1);
   else
     Buzzer(0);

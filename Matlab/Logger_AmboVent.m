@@ -10,7 +10,7 @@ BPM = 20;  % Ciclos por minuto. Hacer coincidir con el programa de Arduino.
            % coincidir.
 
 Comp_per = 80; % Porcentaje de compresión. Hacer coincidir con el programa de Arduino.
-T_total = 5/60;  % Tiempo, en horas
+T_total = 24*7;  % Tiempo, en horas
 N = ceil(T_total*60*BPM);   % número de muestras
 
 M = 7;  % número de datos por ciclo. Debe coincidir con el programa del Arduino
@@ -51,6 +51,7 @@ h24 = animatedline('Color','c');
 xlabel('número de ciclo');
 ylabel('Valor ADC');
 xlim([0, N]);
+% title(sprintf('wanted-pos y A-pot. Comp-per: %d', Comp_per));
 legend('máx deseada', 'máx medida', 'mín deseada', 'mín medida', 'Location', 'east');
 title('Posiciones Extremas del Brazo');
 grid on;
@@ -117,7 +118,8 @@ for n = 1:N
         if(toc(timer_tS) > 15)  % Esperar a que pase el intervalo mínimo de ThingSpeak
             datos_tS = [60/mean(datos((n_prev+1):n,7)),mean(tiempo((n_prev+1):n)),...
                         mean(datos((n_prev+1):n,[2,4,1,3,6,5]),1)];
-            thingSpeakWrite(1071173,datos_tS,'Fields',1:8,'WriteKey','IDPK32NWJQPZNPTO');
+            thingSpeakWrite(1071173,datos_tS,'Fields',1:8,'WriteKey','IDPK32NWJQPZNPTO',...
+                            'Timeout',60);
             timer_tS = tic;
             n_prev = n;
         end
