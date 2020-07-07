@@ -10,7 +10,7 @@ BPM = 20;  % Ciclos por minuto. Hacer coincidir con el programa de Arduino.
            % coincidir.
 
 Comp_per = 80; % Porcentaje de compresión. Hacer coincidir con el programa de Arduino.
-T_total = 24*7;  % Tiempo, en horas
+T_total = 20/60;  % Tiempo, en horas
 N = ceil(T_total*60*BPM);   % número de muestras
 
 M = 7;  % número de datos por ciclo. Debe coincidir con el programa del Arduino
@@ -74,7 +74,7 @@ pause(0.1);
 % Crear objeto serial y abrir el puerto
 % instrreset; % sólo si se tiene el Instrument Control Toolbox
 delete(instrfind);  % Para evitar problemas al abrir y cerrar.
-sObj = serial('COM19','BaudRate',115200);  % REVISAR EL PUERTO
+sObj = serial('COM20','BaudRate',115200);  % REVISAR EL PUERTO
 sObj.Timeout = 30;
 fopen(sObj);
 
@@ -83,22 +83,21 @@ fprintf('PRESIONE START...\n\n');
 
 %% Ciclo de recepción de datos
 timer_tS = tic;
+timer_AV = tic;
 n_prev = 2;
 
 for n = 1:N
-    timer_AV = tic;
+%     timer_AV = tic;
     
     for m = 1:M
         datos(n,m) = fscanf(sObj, '%d');
     end
     tiempo(n) = toc(timer_AV);
-
-    % Para pruebas
-%     pause(tiempo(n));
+    timer_AV = tic;
 
     % Guardar cada minuto, por cualquier cosa
     if(mod(n, BPM) == 0)
-        save(nombre_archivo, 'datos', 'tiempo', 'BPM', 'T_total', 'N', 'M', 'Comp_per');
+        save(nombre_archivo,'datos','tiempo','BPM','T_total','N','M','Comp_per','n');
     end
 
     fprintf('Iteración: %d/%d\n', n, N);

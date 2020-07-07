@@ -2,6 +2,7 @@
  AmboVent-UVG-pruebas
  Based on the original code for the AmboVent (April 12, 2020)
  Modified by Luis Alberto Rivera
+ Universidad Del Valle de Guatemala
 
  CÓDIGO PARA PROBAR MÓDULOS/FUNCIONES QUE SE VAYAN AGREGANDO
  VERSIÓN PARA EL 1er PROTOTIPO DE LA PCB
@@ -22,17 +23,15 @@
  *  USE ONLY AT YOUR OWN RISK.
  */
 
-/*  to start calibrations - first enter the maintenance setup menu by pressing TEST button for 3 seconds
- *  using the RATE potentiometer select the calibration required and press TEST to select
- *  follow instructions on screen
- *  for the Arm range calibration - use the Rate potentiometer to move the arm up/down
+/* To start calibrations: first enter the maintenance setup menu by pressing TEST
+ * button for 3 seconds. Using the RATE potentiometer, select the calibration
+ * required and press TEST to select it. Follow instructions on screen.
  */
 
 // --- System Configuration ---------------------------------------------------
 #define DEBUG 0          // 1 para que forzar a |error| < ERROR_DEBUG
 #define ERROR_DEBUG 20
 #define INVERT_LEDS 1    // 1 if Leds turn ON with 0 (common anode)
-//#define INVERT_BUZZER 0  // 1 if Buzzer turns ON with 0
 #define COMP_PUSHBACK 50 // PUEDE VARIAR, SEGÚN EL AMBU USADO
 
 #define pressure_sensor_available 1 // 1 - you have installed an I2C pressure sensor 
@@ -60,7 +59,7 @@
 #define insp_pressure_default 40        // default value - hold this pressure while breathing - the value is changed if INSP_Pressure potentiometer is inatalled 
 #define safety_pres_above_insp 10       // defines safety pressure as the inspirium pressure + this one
 #define safety_pressure 70              // quickly pullback arm when reaching this pressure in cm H2O
-#define speed_multiplier_reverse 2      // factor of speeed for releasing the pressure (runs motion in reverse at X this speed
+#define speed_multiplier_reverse 2      // factor of speed for releasing the pressure (runs motion in reverse at X this speed
 #define motion_time_default 35          // motion time in 100 mSec 35 = 3500 mSec
 #define patient_triggered_breath_def 1  // 1 = trigger new breath in case of patient inhale during the PEEP plateu 
 #define delta_pres_patient_inhale 5     // in cmH2O
@@ -99,7 +98,7 @@
 
 #define KP_MIN 0.05
 #define KP_MAX 1.5
-#define KP_DEF 0.2              // motion control propportional gain 0.2, 1.2
+#define KP_DEF 0.2              // motion control proportional gain 0.2, 1.2
 #define DELTA_KP ((KP_MAX-KP_MIN)/100.0)
 
 #define KI_MIN 0.1
@@ -114,7 +113,7 @@
 #define pot_alpha 0.85  // filter the pot values
 
 #define integral_limit 10        // limits the integral of error. Original: 5
-#define f_reduction_up_val 0.85  // reduce feedforward by this factor when moving up. Or. 0.85
+#define f_reduction_up_val 0.85  // reduce feed-forward by this factor when moving up. Or. 0.85
 
 // Talon SR or SPARK controller PWM settings ("angle" for Servo library)
 #define PWM_mid 93  // mid value for PWM 0 motion - higher pushes up
@@ -123,8 +122,8 @@
 #define PWM_THR 20    // Umbral
 
 // motion control parameters
-#define cycleTime 8          // milisec  originalmente: 10
-#define alpha 0.95            // filter for current apatation - higher = stronger low pass filter
+#define cycleTime 8           // millisec  originalmente: 10
+//#define alpha 0.95            // filter for current apatation - higher = stronger low pass filter
 #define profile_length 250    // motion control profile length
 #define motion_control_allowed_error  80  // % of range 30, 40
 
@@ -136,11 +135,7 @@
 #include "Adafruit_MPRLS.h"
 #include <LiquidCrystal_I2C.h>
 #include "ArduinoUniqueID.h"
-//#include <Servo.h>
-//#include <OneWire.h>
-//#include <DallasTemperature.h>  // Toma demasiado tiempo, buscar otra opción
 
-//Servo motor;  //TODO: define a constant to select the driver
 
 #if pressure_sensor_available == 1
 Adafruit_MPRLS adafruitPress(-1, -1);  // Default values
@@ -152,14 +147,13 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #endif
 
 #if TempSensor_available == 1
-//OneWire ourWire(pin_TEMP_SENSOR);
-//DallasTemperature DS18B20(&ourWire);
+
 #endif
 
 // Motion profile parameters 
 // pos byte 0...255  units: promiles of full range
 // vel int 0...255  ZERO is at 128 , units: pos change per 0.2 sec
-// profile data:  press 125 points (50%) relase 125
+// profile data:  press 125 points (50%) release 125
 const PROGMEM byte pos[profile_length] =
     {  0,  0,  1,  2,  4,  6,  8, 10, 13, 15, 18, 21, 25, 28, 31, 35, 38, 42, 46, 50,
       54, 57, 61, 66, 70, 74, 78, 82, 86, 91, 95, 99,104,108,112,117,121,125,130,134,
@@ -266,7 +260,6 @@ unsigned long lastSent, lastIndex, lastUSRblink, last_TST_not_pressed, lastBlue,
 float pot_rate, pot_pres, pot_comp, avg_pres;
 float wanted_pos, wanted_vel_PWM, range, range_factor, profile_planned_vel,
       planned_vel, integral, error, prev_error, f_reduction_up;
-      //wanted_manual_vel_PWM;
 
 float FF = FF_DEF, KP = KP_DEF, KI = KI_DEF, FF_temp, KP_temp, KI_temp;
 
@@ -302,7 +295,6 @@ void setup()
   pinMode(pin_LED_FAIL, OUTPUT);
   pinMode(pin_LED_USR, OUTPUT);
 
-//  motor.attach(pin_PWM);
   Serial.begin(115200);
   Wire.begin();
 
@@ -313,7 +305,7 @@ void setup()
 
 #if LCD_available == 1
   lcd.begin();      // initialize the LCD
-  lcd.backlight();  // Turn on the backlight and print a message.
+  lcd.backlight();  // Turn on the back-light and print a message.
   lcd.setCursor(0, 0);  lcd.print("    AmboVent    ");
   lcd.setCursor(0, 1);  lcd.print("  UVG + HUMANA  ");
   delay(2000);
@@ -328,7 +320,7 @@ void setup()
 #endif
 
 #if TempSensor_available == 1
-//  DS18B20.begin();
+
 #endif
 
   state = STBY_STATE;
@@ -386,7 +378,7 @@ void setup()
   motion_time = motion_time_default;
 
 #if LCD_available == 1
-  lcd.backlight();  // Turn on the backlight and print a message.
+  lcd.backlight();  // Turn on the back-light and print a message.
 #endif
 
 #if DEBUG == 1   
@@ -452,7 +444,7 @@ void loop()
 
       break;
 
-    case MENU_STATE:     // maintanance menu
+    case MENU_STATE:     // maintenance menu
       display_menu();
 
       break;
@@ -511,7 +503,7 @@ void display_menu()
       break;
 
 
-    case 3:     // calib pressure sensor
+    case 3:     // calibrate pressure sensor
       display_text_2_lines("Calib pressure", "TEST to start");
 
       if(bitRead(Buttons1, TST_pressed))
@@ -536,7 +528,7 @@ void display_menu()
       break;
 
 
-    case 4:     // calib arm range of movement
+    case 4:     // calibrate arm range of movement
       display_text_2_lines("Calibrate Arm", "TEST to start");
 
       if(bitRead(Buttons1, TST_pressed))
@@ -660,7 +652,7 @@ void display_menu()
 
 // TAL VEZ ANTES DE PARAR AL MOTOR, LLEVARLO A LA SAFE POSITION
           // Make sure the motor stops after controller calibration
-          wanted_vel_PWM = 0;  // dont move
+          wanted_vel_PWM = 0;  // don't move
           set_motor_PWM(wanted_vel_PWM);
 
           if(bitRead(Status, save_cancelled) == 0)
@@ -835,12 +827,12 @@ void run_profile_func()
     if(bitRead(Alarms, in_wait) == 0)
       index += (1 + cycles_lost);  // advance index while not waiting at the end of cycle
 
-    if(bitRead(Alarms, patient_triggered_breath) == 1)  // detect drop in presure during the PEEP plateu and trigger breath based on this
+    if(bitRead(Alarms, patient_triggered_breath) == 1)  // detect drop in pressure during the PEEP plateau and trigger breath based on this
     {
       if(bitRead(Alarms, in_wait) == 1 || (index > profile_length/2 && (A_pot < min_arm_pos + range/18)))
       {
         if(avg_pres - pressure_abs > delta_pres_patient_inhale)
-          start_new_cycle();  // start new breath cycle if patient tries to inhale durint the PEEP plateu
+          start_new_cycle();  // start new breath cycle if patient tries to inhale during the PEEP plateau
 
         avg_pres = avg_pres*alpha_pres + (1 - alpha_pres)*float(pressure_abs);  // calculate the filtered pressure
       }
@@ -850,7 +842,7 @@ void run_profile_func()
       }  // initialize the filtered pressure
     }
 
-    if(index >= (profile_length - 2))  // wait for the next cycle to begin in this point -> 2 points befoe the last cycle index
+    if(index >= (profile_length - 2))  // wait for the next cycle to begin in this point -> 2 points before the last cycle index
     {
       if(bitRead(Status, sent_LCD) == 0)
       {
@@ -882,7 +874,6 @@ void run_profile_func()
 void calculate_wanted_pos_vel()
 {
   byte pos_from_profile, vel_from_profile;
-//  float adj_val;
 
   pos_from_profile = pgm_read_byte_near(pos + index);
   vel_from_profile = pgm_read_byte_near(vel + index + 1);
@@ -890,32 +881,6 @@ void calculate_wanted_pos_vel()
   // range of movement in pot' readings
   range = range_factor*(max_arm_pos - min_arm_pos);
 
-// BETTER NOT HERE, BUT IN FUNCTION Read_IO
-/*// Adjust the wanted_pos vector, according to the adj_v values, which
-// are calibrated to match the actual volumes corresponding to the
-// compression_perc.
-  adj_ind = map(Compression_perc, byte(perc_of_lower_volume), 100, 0, N_adj-1);
-  adj_ind = constrain(adj_ind, 0, N_adj-1);
-
-// If the Compression_perc matches one of the predefined (calibrated percentages),
-// use the corresponding adj_v. If not, interpolate.
-  if(Compression_perc == pgm_read_byte_near(Comp_perc_v + adj_ind))
-    adj_val = adj_v[adj_ind]/100.0;
-  else if(Compression_perc > pgm_read_byte_near(Comp_perc_v + adj_ind))
-  {
-    adj_val = (1.0*(Compression_perc - pgm_read_byte_near(Comp_perc_v + adj_ind))*
-              (adj_v[adj_ind + 1] - adj_v[adj_ind])/
-              (pgm_read_byte_near(Comp_perc_v + adj_ind + 1) - 
-               pgm_read_byte_near(Comp_perc_v + adj_ind)) + 1.0*adj_v[adj_ind])/100.0;
-  }
-  else
-  {
-    adj_val = (1.0*(Compression_perc - pgm_read_byte_near(Comp_perc_v + adj_ind - 1))*
-              (adj_v[adj_ind] - adj_v[adj_ind - 1])/
-              (pgm_read_byte_near(Comp_perc_v + adj_ind) - 
-               pgm_read_byte_near(Comp_perc_v + adj_ind - 1)) + 1.0*adj_v[adj_ind - 1])/100.0;
-  }
-*/
   // wanted pos in pot clicks
   wanted_pos = adj_val*float(pos_from_profile)*range/255 + min_arm_pos;
   wanted_pos = constrain(wanted_pos, 0.0, 1023.0);
@@ -935,7 +900,7 @@ void calculate_wanted_pos_vel()
     wanted_pos = float(A_pot);  // hold current position
   }
 
-  if(bitRead(Alarms, safety_pressure_detected))  // to do the revese in case high pressure detected
+  if(bitRead(Alarms, safety_pressure_detected))  // to do the reverse in case high pressure detected
     planned_vel = -speed_multiplier_reverse*planned_vel;
 
   prev_error = error;
@@ -958,7 +923,6 @@ void calculate_wanted_pos_vel()
   if(planned_vel < 0)
   {
     f_reduction_up = f_reduction_up_val;
-//    error = 0.5*error;
   }
   else
     f_reduction_up = 1;  // reduce f for the movement up
@@ -969,7 +933,7 @@ void calculate_wanted_pos_vel()
   // reduce speed for longer cycles
   wanted_vel_PWM = wanted_vel_PWM*float(cycleTime)/float(wanted_cycle_time);
 
-  //if(index > int(0.8*profile_length) && abs(wanted_vel_PWM) < 15)
+  // Force motor to stop when the arm is about to get to the uppest position
   if(index > int(0.6*profile_length) && A_pot < (min_arm_pos + int(0.02*range)))
     wanted_vel_PWM = 0;
 
@@ -1245,7 +1209,6 @@ void display_pot_during_calib()
 void calibrate_arm_range()   // used for calibaration of motion range
 {
   LED_USR(1);
-//  bitSet(Status, calibON);  // NO ES NECESARIO, NO SE REVISA ANTES DE CLEAREARLA
   bitClear(Status, progress);
 
   display_text_calib("Set Upper");
@@ -1322,7 +1285,7 @@ void internal_arm_calib_step()
   delay(3);
 }
 
-void calibrate_pot_range()   // used for calibaration of potentiometers
+void calibrate_pot_range()   // used for calibration of potentiometers
 { 
   LED_USR(1);
 
@@ -1430,10 +1393,6 @@ void set_motor_PWM(float wanted_vel_PWM)
 
   if(wanted_vel_PWM < PWM_min)
     wanted_vel_PWM = PWM_min;  // limit PWM
-
-// Set PWM through the REV Robotics SPARK Motor driver. Values between 0 and 180 ---
-//  motorPWM = PWM_mid + int(wanted_vel_PWM);
-//  motor.write(motorPWM);
 
 // Set PWM through the VNH5019A-E driver. Values between 0 and 255 ---
   if(wanted_vel_PWM < 0)
@@ -1619,7 +1578,6 @@ void adj_v_module()
 
   for(i = 0; i < N_adj; i++)
   {
-//    Compression_perc = (int)(Compression_perc_v[i]);
     Compression_perc = (byte)(pgm_read_byte_near(Comp_perc_v + i));
 
     read_IO();
@@ -1654,13 +1612,13 @@ void adj_v_module()
 
 // TAL VEZ ANTES DE PARAR AL MOTOR, LLEVARLO A LA SAFE POSITION
   // Make sure the motor stops after setting the adj_v values
-  wanted_vel_PWM = 0;  // dont move
+  wanted_vel_PWM = 0;  // don't move
   set_motor_PWM(wanted_vel_PWM);
 
   if(bitRead(Status, save_cancelled) == 0)
   {
     delay(DELTA_LCD_REFRESH);
-    display_text_2_lines("Ctrl. Calibr.", "Completed");
+    display_text_2_lines("Adj_v Calib.", "Completed");
 
   // Save adjustment vector values to the EEPROM
     for(i = 0; i < N_adj; i++)
@@ -1950,7 +1908,7 @@ void read_IO()
 
 //  BPM = 6 + (A_rate - 23)/55;       // 0 is 6 breaths per minute, 1023 is 24 BPM
   BPM = round(6.0 + 24.0*A_rate/1023);       // 0 is 6 breaths per minute, 1023 is 30 BPM
-  breath_cycle_time = 60000/BPM + 100;  // in milisec. ¿POR QUÉ ESE OFFSET DE 100?
+  breath_cycle_time = 60000/BPM + 100;  // in millisec. ¿POR QUÉ ESE OFFSET DE 100?
 
   insp_pressure = 30 + A_pres/25;          // 0 is 30 mBar, 1023 is 70 mBar
   insp_pressure = constrain(insp_pressure, 30, 70);
@@ -2020,8 +1978,7 @@ void read_IO()
 
 
 #if TempSensor_available == 1
-//  DS18B20.requestTemperatures(); 
-//  temperature = DS18B20.getTempCByIndex(0);
+
 #endif
 
   wanted_cycle_time = int(100)*int(motion_time)/profile_length; // between 10 and 20
@@ -2031,12 +1988,6 @@ void read_IO()
 
   if(wanted_cycle_time < cycleTime)
     wanted_cycle_time = cycleTime;  // 8 ó 10, según se haya definido
-
-// // Conditions for buzzing: pressure failure,
-//  if(failure == 2)
-//    Buzzer(1);
-//  else
-//    Buzzer(0);
 }
 
 void LED_FAIL(byte val)
@@ -2054,15 +2005,6 @@ void LED_USR(byte val)
   else
     digitalWrite(pin_LED_USR, val);
 }
-/*
-void Buzzer(byte val)
-{
-  if(INVERT_BUZZER)
-    digitalWrite(pin_BUZZER, 1 - val);
-  else
-    digitalWrite(pin_BUZZER, val);
-}
-*/
 
 void print_tele()  // UNCOMMENT THE TELEMETRY NEEDED
 {

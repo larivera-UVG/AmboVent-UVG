@@ -43,7 +43,7 @@ sObj.Timeout = 30;
 fopen(sObj);
 
 pause(5);  % Para dar tiempo que el Arduino se reinicie.
-fprintf('PRESIONE START...\n\n');
+fprintf('INICIO...\n\n');
 
 %% Ciclo de recepción de datos
 timer_tS = tic;
@@ -58,12 +58,13 @@ for n = 1:N
 
     % Guardar cada minuto, por cualquier cosa
     if(mod(n, 60/DT) == 0)
-        save(nombre_archivo, 'Temperatura', 'tiempo', 'N');
+        save(nombre_archivo, 'Temperatura', 'tiempo', 'N', 'n');
     end
 
     fprintf('Iteración: %d/%d\n', n, N);
     
     addpoints(h11, n, Temperatura(n,1));
+    ylim([min(Temperatura(1:n))-1, max(Temperatura(1:n))+1]);
     
     if(toc(timer_tS) > 15)  % Esperar a que pase el intervalo mínimo de ThingSpeak
         datos_tS = mean(Temperatura((n_prev+1):n));
