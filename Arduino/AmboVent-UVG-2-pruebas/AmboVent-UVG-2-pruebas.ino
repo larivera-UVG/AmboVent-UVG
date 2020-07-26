@@ -37,6 +37,7 @@
 #define pressure_sensor_available 1 // 1 - I2C pressure sensor installed
 #define TempSensor_available 0      // 1 - temperature sensor available
 #define LCD_available 1             // 1 - LCD available
+#define ALARM_ENABLED 1             // 1 - Alarm will sound, if conditions are met
 
 // motor and sensor definitions
 #define invert_mot 0  // Careful with these. Make sure connections
@@ -44,7 +45,7 @@
 
 // options for display, debug and logging data via serial com
 #define telemetry 1   // 1 - send telemetry for debugging
-#define LOGGER    0   // 1 - send log data. This disables the telemetry
+#define LOGGER    1   // 1 - send log data. This disables the telemetry
 #define DELTA_T_TELEMETRY 250  // Delta time (ms) for displaying telemetry
 #define DELTA_LCD_REFRESH 150  // Delta time (ms) for refreshing the LCD
 
@@ -112,7 +113,7 @@
 #define DELTA_KI ((KI_MAX-KI_MIN)/100.0)
 
 #define integral_limit    10     // Limits the integral of error. Original: 5
-#define f_reduction_up_val 0.85  // To reduce feed-forward when moving up.
+#define f_reduction_up_val 0.85  // To reduce feed-forward when moving up. 0.85
 
 // Adjustment vector min and max percentages
 #define ADJ_V_MIN  10
@@ -661,7 +662,7 @@ void display_menu()
 
       if(bitRead(Buttons1, TST_pressed))
       {
-        // patient_triggered_breath = 1 - patient_triggered_breath;
+        //patient_triggered_breath = 1 - patient_triggered_breath;
         bitWrite(Alarms, patient_triggered_breath,
                                 1 - bitRead(Alarms, patient_triggered_breath));
         delay(DELTA_LCD_REFRESH); // wait enough time for display to be updated
@@ -1112,8 +1113,25 @@ void standby_func()
     }
   }
 
-  wanted_vel_PWM = 0;  // don't move
-  set_motor_PWM(wanted_vel_PWM);
+  // If TEST button is pressed (but not held), move the arm for one cycle
+/*  if(bitRead(Buttons1, TST_pressed))
+  {
+    initialize_breath();
+    bitSet(Status, progress);
+  }
+
+  if(bitRead(Status, progress) == 1)
+  {
+    run_profile_func();
+
+    if(cycle_number > 0)
+      bitClear(Status, progress);
+  }
+  else
+  {  */
+    wanted_vel_PWM = 0;  // don't move
+    set_motor_PWM(wanted_vel_PWM);
+//  }
 
   delay(1);
 }
@@ -1432,9 +1450,9 @@ void internal_arm_calib_step()
     digitalWrite(pin_INA, HIGH);
     digitalWrite(pin_INB, LOW);
 
-    motorPWM = 100;  // determines how aggressive is the motion down (0, 255]
+    motorPWM = 100;  // determines how aggressive is the motion downwards (0, 255] // 100
     analogWrite(pin_PWM, motorPWM);
-    delay(100);
+    delay(50); // 100
     analogWrite(pin_PWM, 0);
   }
 
@@ -1443,9 +1461,9 @@ void internal_arm_calib_step()
     digitalWrite(pin_INA, LOW);
     digitalWrite(pin_INB, HIGH);
 
-    motorPWM = 50;  // determines how aggressive is the motion up (0, 255]
+    motorPWM = 50;  // determines how aggressive is the motion upwards (0, 255]
     analogWrite(pin_PWM, motorPWM);
-    delay(100);
+    delay(50); // 100
     analogWrite(pin_PWM, 0);
   }
 
@@ -1521,7 +1539,7 @@ void display_LCD()
     lcd.print("Comp:");
     lcd.print(byte(Compression_perc));
     lcd.print("%");
-    lcd.print("  RPM:");
+    lcd.print(" RPM:");
   #endif
     lcd.print(byte(BPM));
 
@@ -2274,7 +2292,7 @@ void read_IO()
     wanted_cycle_time = cycleTime;  // min cycleTime was #defined above
 
 // Cond. for buzzing: Not in logging mode, pressure failure, not in calibration
-#if LOGGER == 0
+#if LOGGER == 0 && ALARM_ENABLED == 1
   if(failure == 1 && bitRead(Status, calibON) == 0)
     Buzzer(1);
   else
@@ -2295,7 +2313,7 @@ void LED_USR(byte val)
     digitalWrite(pin_LED_USR, val);
 }
 
-#if LOGGER == 0
+#if LOGGER == 0 && ALARM_ENABLED == 1
 // To turn ON or OFF the buzzer
 void Buzzer(byte val)
 {
@@ -2350,6 +2368,7 @@ void print_tele()
     Serial.print(", Feedback: ");        Serial.print(A_pot);
     Serial.print(", wanted_pos: ");      Serial.print(wanted_pos);
     Serial.print(", error: ");           Serial.print(error);
+    Serial.print(", % error: ");         Serial.print(100*abs(error)/(max_arm_pos - min_arm_pos));
 //    Serial.print(", integral: ");        Serial.print(integral);
     Serial.println("");
 
