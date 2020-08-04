@@ -6,7 +6,7 @@ clc;
 pause(0.1);
 
 DT = 20;  % Tiempo entre medición, en segundos
-T_total = 5/60;  % Tiempo, en horas
+T_total = 3*24;  % Tiempo, en horas
 N = ceil(T_total*60*60/DT);   % número de muestras
 
 Temperatura = zeros(N,1);
@@ -38,8 +38,8 @@ pause(0.1);
 % Crear objeto serial y abrir el puerto
 % instrreset; % sólo si se tiene el Instrument Control Toolbox
 delete(instrfind);  % Para evitar problemas al abrir y cerrar.
-sObj = serial('COM20','BaudRate',115200);  % REVISAR EL PUERTO
-sObj.Timeout = 30;
+sObj = serial('COM3','BaudRate',115200);  % REVISAR EL PUERTO
+sObj.Timeout = 60;
 fopen(sObj);
 
 pause(5);  % Para dar tiempo que el Arduino se reinicie.
@@ -48,7 +48,7 @@ fprintf('INICIO...\n\n');
 %% Ciclo de recepción de datos
 timer_tS = tic;
 timer_AV = tic;
-n_prev = 2;
+n_prev = 0;
 
 for n = 1:N
     Temperatura(n) = fscanf(sObj, '%d');

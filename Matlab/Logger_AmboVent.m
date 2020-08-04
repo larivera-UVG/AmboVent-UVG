@@ -10,7 +10,7 @@ BPM = 20;  % Ciclos por minuto. Hacer coincidir con el programa de Arduino.
            % coincidir.
 
 Comp_per = 80; % Porcentaje de compresión. Hacer coincidir con el programa de Arduino.
-T_total = 20/60;  % Tiempo, en horas
+T_total = 2/60;  % Tiempo, en horas
 N = ceil(T_total*60*BPM);   % número de muestras
 
 M = 7;  % número de datos por ciclo. Debe coincidir con el programa del Arduino
@@ -35,7 +35,7 @@ hold on;
 h12 = animatedline('Color','r');
 xlabel('número de ciclo');
 ylabel('tiempo (seg)');
-xlim([0, N]);
+% xlim([0, N]);
 ylim([1, 12]);
 legend('Teórico', 'Medido');
 title('Duración de los Ciclos');
@@ -50,7 +50,7 @@ h23 = animatedline('Color','b');
 h24 = animatedline('Color','c');
 xlabel('número de ciclo');
 ylabel('Valor ADC');
-xlim([0, N]);
+% xlim([0, N]);
 % title(sprintf('wanted-pos y A-pot. Comp-per: %d', Comp_per));
 legend('máx deseada', 'máx medida', 'mín deseada', 'mín medida', 'Location', 'east');
 title('Posiciones Extremas del Brazo');
@@ -64,7 +64,7 @@ h32 = animatedline('Color','b');
 xlabel('número de ciclo');
 ylabel('mbar');
 ylim([-1, 30]);
-xlim([0, N]);
+% xlim([0, N]);
 legend('Máximos', 'Mínimos');
 title('Máximos y Mínimos de Presión');
 grid on;
@@ -105,15 +105,20 @@ for n = 1:N
     if(n > 2)
         addpoints(h11, n, 60/datos(n,7));
         addpoints(h12, n, tiempo(n));
+        figure(1); xlim([2, n+1]);
         
         addpoints(h21, n, datos(n,2));
         addpoints(h22, n, datos(n,4));
         addpoints(h23, n, datos(n,1));
         addpoints(h24, n, datos(n,3));
+        figure(2); xlim([2, n+1]);
         
         addpoints(h31, n, datos(n,6));
         addpoints(h32, n, datos(n,5));
-                
+        figure(3); xlim([2, n+1]);
+        
+        drawnow limitrate
+        
         if(toc(timer_tS) > 15)  % Esperar a que pase el intervalo mínimo de ThingSpeak
             datos_tS = [60/mean(datos((n_prev+1):n,7)),mean(tiempo((n_prev+1):n)),...
                         mean(datos((n_prev+1):n,[2,4,1,3,6,5]),1)];
@@ -123,12 +128,11 @@ for n = 1:N
             n_prev = n;
         end
         
-        drawnow limitrate
     end
 end
 
 figure(3);
-ylim([(min([0; datos(2:N,5)])-1), (max([9; datos(2:N,6)])+1)]);
+ylim([(min([2; datos(2:N,5)])-1), (max([9; datos(2:N,6)])+1)]);
 
 save(nombre_archivo, 'datos', 'tiempo', 'BPM', 'T_total', 'N', 'M', 'Comp_per');
 

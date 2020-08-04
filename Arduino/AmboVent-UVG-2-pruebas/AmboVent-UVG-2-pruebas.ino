@@ -32,12 +32,12 @@
 #define LANGUAGE       1 // For LCD messages. 0 - English, 1 - Español.
 #define INVERT_LEDS    1 // 1 if LEDs turn ON with 0 (common anode)
 #define INVERT_BUZZER  0 // 1 if Buzzer turns ON with 0
-#define COMP_PUSHBACK 50 // Compensates push-back from Ambu. Depends on Ambu used.
+#define COMP_PUSHBACK  0 // Compensates push-back from Ambu. Depends on Ambu used.  //50
 
 #define pressure_sensor_available 1 // 1 - I2C pressure sensor installed
 #define TempSensor_available 0      // 1 - temperature sensor available
 #define LCD_available 1             // 1 - LCD available
-#define ALARM_ENABLED 1             // 1 - Alarm will sound, if conditions are met
+#define ALARM_ENABLED 0             // 1 - Alarm will sound, if conditions are met
 
 // motor and sensor definitions
 #define invert_mot 0  // Careful with these. Make sure connections
@@ -45,7 +45,7 @@
 
 // options for display, debug and logging data via serial com
 #define telemetry 1   // 1 - send telemetry for debugging
-#define LOGGER    1   // 1 - send log data. This disables the telemetry
+#define LOGGER    1   // 1 - send log data. This disables the telemetry and alarm
 #define DELTA_T_TELEMETRY 250  // Delta time (ms) for displaying telemetry
 #define DELTA_LCD_REFRESH 150  // Delta time (ms) for refreshing the LCD
 
@@ -113,7 +113,7 @@
 #define DELTA_KI ((KI_MAX-KI_MIN)/100.0)
 
 #define integral_limit    10     // Limits the integral of error. Original: 5
-#define f_reduction_up_val 0.85  // To reduce feed-forward when moving up. 0.85
+#define f_reduction_up_val 0.85  // To reduce or increase feed-forward when moving up. // 0.85, 1.5
 
 // Adjustment vector min and max percentages
 #define ADJ_V_MIN  10
@@ -130,7 +130,7 @@
 #define cycleTime        8     // milisec  originally: 10
 #define alpha            0.95  // filter. Higher = stronger low pass filter
 #define profile_length 250     // motion control profile length
-#define motion_control_allowed_error  80  // % of range 30, 40
+#define motion_control_allowed_error  110  // % of range 30, 40
 
 #define N_adj 15  // Size of adjustment vector for wanted_pos
 
@@ -267,7 +267,7 @@ unsigned long lastSent, lastIndex, lastUSRblink, last_TST_not_pressed, lastBlue,
 
 float pot_rate, pot_pres, pot_comp, avg_pres;
 float wanted_pos, wanted_vel_PWM, range, range_factor, profile_planned_vel,
-      planned_vel, integral, error, prev_error, f_reduction_up;
+      planned_vel, integral, error, prev_error, max_error, f_reduction_up;
 
 float FF = FF_DEF, KP = KP_DEF, KI = KI_DEF, FF_temp, KP_temp, KI_temp;
 
@@ -931,9 +931,13 @@ void run_profile_func()
     calculate_wanted_pos_vel();
 
     // check condition for motion failure (percentual error)
-    if(100*abs(error)/(max_arm_pos - min_arm_pos) >
-                              motion_control_allowed_error && cycle_number > 1)
+    if(100*abs(error)/(max_arm_pos - min_arm_pos) > max_error)
+      max_error = 100*abs(error)/(max_arm_pos - min_arm_pos);
+
+    if(max_error > motion_control_allowed_error && cycle_number > 1)
       bitSet(Alarms, motion_failure);
+    else
+      bitClear(Alarms, motion_failure);
 
     // run in reverse if high pressure was detected
     if(bitRead(Alarms, safety_pressure_detected))
@@ -1067,11 +1071,15 @@ void calculate_wanted_pos_vel()
   // Controller correction
   wanted_vel_PWM = FF*planned_vel*f_reduction_up + KP*error + KI*integral;
 
+  // To reduce small oscillations that may happen in transitions upwards-downwards
+  if((planned_vel > 0.0 && wanted_vel_PWM < 0.0) || (planned_vel < 0.0 && wanted_vel_PWM > 0.0))
+    wanted_vel_PWM = 0.5*wanted_vel_PWM;
+
   // reduce speed for longer cycles
   wanted_vel_PWM = wanted_vel_PWM*float(cycleTime)/float(wanted_cycle_time);
 
   // To help prevent the arm from going beyond the min wanted position
-  if(index > int(0.6*profile_length) && A_pot < (min_arm_pos + int(0.02*range)))
+  if(index > int(0.6*profile_length) && A_pot < (min_arm_pos + int(0.1*range)))
     wanted_vel_PWM = 0;
 
   // Terms to be sent to the logger
@@ -1145,6 +1153,7 @@ void initialize_breath()
   integral = 0;
   reset_failures();
   index = 0;
+  max_error = 0.0;
   bitClear(Alarms, in_wait);
   bitClear(Alarms, high_pressure_detected);
 }
@@ -1153,6 +1162,7 @@ void initialize_breath()
 void start_new_cycle()
 {
   index = 0;  // beginning of the cycle
+  max_error = 0.0;
 
   if(cycle_number < 255)  // not really important once it goes beyond 2
     cycle_number += 1;
@@ -1296,7 +1306,7 @@ void calc_failure()
     safety_pressure_counter = 1;
   }
 
-  // Motion failure (motion error above the threshold
+  // Motion failure (motion error above the threshold)
   if(bitRead(Alarms, motion_failure))
     failure = 3;
 
@@ -1589,7 +1599,7 @@ void display_LCD()
     if(failure == 3)
     {
   #if LANGUAGE == 0
-      lcd.print("Motion Fail");
+      lcd.print("Motion Fail.");
   #else
       lcd.print("Falla de Movim.");
   #endif
@@ -1618,8 +1628,8 @@ void set_motor_PWM(float wanted_vel_PWM)
     wanted_vel_PWM = -wanted_vel_PWM;
 
   // Don't move if there was a motion failure while not in calibration.
-  if(bitRead(Alarms, motion_failure) == 1 && bitRead(Status, calibON) == 0)
-    wanted_vel_PWM = 0;
+//  if(bitRead(Alarms, motion_failure) == 1 && bitRead(Status, calibON) == 0)
+//    wanted_vel_PWM = 0;
 
   if(wanted_vel_PWM > 0)
     wanted_vel_PWM += 3;  // undo controller dead band
@@ -2365,10 +2375,14 @@ void print_tele()
 
     Serial.print("RF: ");                Serial.print(range_factor); 
     Serial.print(", Index: ");           Serial.print(index);
-    Serial.print(", Feedback: ");        Serial.print(A_pot);
     Serial.print(", wanted_pos: ");      Serial.print(wanted_pos);
-    Serial.print(", error: ");           Serial.print(error);
+    Serial.print(", Feedback: ");        Serial.print(A_pot);
+    Serial.println("");
+   
+    Serial.print("error: ");             Serial.print(error);
     Serial.print(", % error: ");         Serial.print(100*abs(error)/(max_arm_pos - min_arm_pos));
+    Serial.print(", max_error: ");       Serial.print(max_error);
+    
 //    Serial.print(", integral: ");        Serial.print(integral);
     Serial.println("");
 
